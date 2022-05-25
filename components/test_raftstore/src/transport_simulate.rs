@@ -224,6 +224,7 @@ impl<C: RaftStoreRouter<RocksEngine>> ProposalRouter<RocksSnapshot> for Simulate
         &self,
         cmd: RaftCommand<RocksSnapshot>,
     ) -> std::result::Result<(), TrySendError<RaftCommand<RocksSnapshot>>> {
+        info!("ProposalRouter<RocksSnapshot>::send for SimulateTransport<C>");
         ProposalRouter::<RocksSnapshot>::send(&self.ch, cmd)
     }
 }

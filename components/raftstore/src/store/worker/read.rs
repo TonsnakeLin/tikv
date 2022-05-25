@@ -33,7 +33,7 @@ use tikv_util::codec::number::decode_u64;
 use tikv_util::lru::LruCache;
 use tikv_util::time::monotonic_raw_now;
 use tikv_util::time::{Instant, ThreadReadId};
-use tikv_util::{debug, error};
+use tikv_util::{info, debug, error};
 
 use super::metrics::*;
 use crate::store::fsm::store::StoreMeta;
@@ -482,6 +482,7 @@ where
         debug!("localreader redirects command"; "command" => ?cmd);
         let region_id = cmd.request.get_header().get_region_id();
         let mut err = errorpb::Error::default();
+        info!("LocalReader::redirect");
         match ProposalRouter::send(&self.router, cmd) {
             Ok(()) => return,
             Err(TrySendError::Full(c)) => {

@@ -9,6 +9,8 @@ use kvproto::raft_cmdpb::RaftCmdRequest;
 use kvproto::raft_serverpb::RaftMessage;
 use raft::SnapshotStatus;
 use tikv_util::time::ThreadReadId;
+use tikv_util::info;
+use tikv_util::typename::TypeInfo;
 
 use crate::store::fsm::RaftRouter;
 use crate::store::transport::{CasualRouter, ProposalRouter, SignificantRouter, StoreRouter};
@@ -172,6 +174,12 @@ pub struct ServerRaftStoreRouter<EK: KvEngine, ER: RaftEngine> {
     local_reader: RefCell<LocalReader<RaftRouter<EK, ER>, EK>>,
 }
 
+impl<EK: KvEngine, ER: RaftEngine> TypeInfo for ServerRaftStoreRouter<EK, ER> {
+    fn type_name() -> String {
+        "ServerRaftStoreRouter".to_string()
+    }
+}
+
 impl<EK: KvEngine, ER: RaftEngine> Clone for ServerRaftStoreRouter<EK, ER> {
     fn clone(&self) -> Self {
         ServerRaftStoreRouter {
@@ -206,12 +214,14 @@ impl<EK: KvEngine, ER: RaftEngine> ProposalRouter<EK::Snapshot> for ServerRaftSt
         &self,
         cmd: RaftCommand<EK::Snapshot>,
     ) -> std::result::Result<(), TrySendError<RaftCommand<EK::Snapshot>>> {
+        info!("ProposalRouter<EK::Snapshot>::send for ServerRaftStoreRouter");
         ProposalRouter::send(&self.router, cmd)
     }
 }
 
 impl<EK: KvEngine, ER: RaftEngine> CasualRouter<EK> for ServerRaftStoreRouter<EK, ER> {
     fn send(&self, region_id: u64, msg: CasualMessage<EK>) -> RaftStoreResult<()> {
+        info!("CasualRouter<EK>::send for ServerRaftStoreRouter<EK, ER>");
         CasualRouter::send(&self.router, region_id, msg)
     }
 }
@@ -243,6 +253,7 @@ impl<EK: KvEngine, ER: RaftEngine> LocalReadRouter<EK> for ServerRaftStoreRouter
         req: RaftCmdRequest,
         cb: Callback<EK::Snapshot>,
     ) -> RaftStoreResult<()> {
+        info!("ServerRaftStoreRouter::read {}", ServerRaftStoreRouter::<EK, ER>::type_name());
         let mut local_reader = self.local_reader.borrow_mut();
         local_reader.read(read_id, req, cb);
         Ok(())

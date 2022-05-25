@@ -234,6 +234,7 @@ where
     /// Send the message to specified address.
     #[inline]
     pub fn send(&self, addr: u64, msg: N::Message) -> Result<(), TrySendError<N::Message>> {
+        info!("Router<N, C, Ns, Cs>::send");
         match self.try_send(addr, msg) {
             Either::Left(res) => res,
             Either::Right(m) => Err(TrySendError::Disconnected(m)),

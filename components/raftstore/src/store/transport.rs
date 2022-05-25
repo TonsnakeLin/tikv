@@ -7,7 +7,7 @@ use crossbeam::channel::{SendError, TrySendError};
 use engine_traits::{KvEngine, RaftEngine, Snapshot};
 use kvproto::raft_serverpb::RaftMessage;
 use std::sync::mpsc;
-use tikv_util::error;
+use tikv_util::{info, error};
 
 /// Transports messages between different Raft peers.
 pub trait Transport: Send + Clone {
@@ -66,6 +66,7 @@ where
 {
     #[inline]
     fn send(&self, region_id: u64, msg: CasualMessage<EK>) -> Result<()> {
+        info!("CasualRouter<EK>::send for RaftRouter<EK, ER>");
         match self.router.send(region_id, PeerMsg::CasualMessage(msg)) {
             Ok(()) => Ok(()),
             Err(TrySendError::Full(_)) => Err(Error::Transport(DiscardReason::Full)),
@@ -104,6 +105,7 @@ where
         &self,
         cmd: RaftCommand<EK::Snapshot>,
     ) -> std::result::Result<(), TrySendError<RaftCommand<EK::Snapshot>>> {
+        info!("ProposalRouter<EK::Snapshot>::send for RaftRouter<EK, ER>");
         self.send_raft_command(cmd)
     }
 }
