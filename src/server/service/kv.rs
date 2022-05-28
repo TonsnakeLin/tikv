@@ -356,6 +356,7 @@ impl<T: RaftStoreRouter<E::Local> + 'static, E: Engine, L: LockManager, Api: API
     }
 
     fn kv_gc(&mut self, ctx: RpcContext<'_>, _: GcRequest, sink: UnarySink<GcResponse>) {
+        info!("kv_gc");
         let e = RpcStatus::new(RpcStatusCode::UNIMPLEMENTED);
         ctx.spawn(
             sink.fail(e)
@@ -365,6 +366,7 @@ impl<T: RaftStoreRouter<E::Local> + 'static, E: Engine, L: LockManager, Api: API
 
     fn coprocessor(&mut self, ctx: RpcContext<'_>, req: Request, sink: UnarySink<Response>) {
         forward_unary!(self.proxy, coprocessor, ctx, req, sink);
+        info!("coprocessor {:?}",req);
         let begin_instant = Instant::now_coarse();
         let future = future_copr(&self.copr, Some(ctx.peer()), req);
         let task = async move {
@@ -392,6 +394,7 @@ impl<T: RaftStoreRouter<E::Local> + 'static, E: Engine, L: LockManager, Api: API
         req: RawCoprocessorRequest,
         sink: UnarySink<RawCoprocessorResponse>,
     ) {
+        info!("raw_coprocessor {:?}",req);
         let begin_instant = Instant::now_coarse();
         let future = future_raw_coprocessor(&self.copr_v2, &self.storage, req);
         let task = async move {
@@ -419,6 +422,7 @@ impl<T: RaftStoreRouter<E::Local> + 'static, E: Engine, L: LockManager, Api: API
         req: RegisterLockObserverRequest,
         sink: UnarySink<RegisterLockObserverResponse>,
     ) {
+        info!("register_lock_observer {:?}",req);
         let begin_instant = Instant::now_coarse();
 
         let (cb, f) = paired_future_callback();
@@ -458,6 +462,7 @@ impl<T: RaftStoreRouter<E::Local> + 'static, E: Engine, L: LockManager, Api: API
         req: CheckLockObserverRequest,
         sink: UnarySink<CheckLockObserverResponse>,
     ) {
+        info!("check_lock_observer {:?}",req);
         let begin_instant = Instant::now_coarse();
 
         let (cb, f) = paired_future_callback();
@@ -501,6 +506,7 @@ impl<T: RaftStoreRouter<E::Local> + 'static, E: Engine, L: LockManager, Api: API
         req: RemoveLockObserverRequest,
         sink: UnarySink<RemoveLockObserverResponse>,
     ) {
+        info!("remove_lock_observer {:?}",req);
         let begin_instant = Instant::now_coarse();
 
         let (cb, f) = paired_future_callback();
@@ -538,6 +544,7 @@ impl<T: RaftStoreRouter<E::Local> + 'static, E: Engine, L: LockManager, Api: API
         mut req: PhysicalScanLockRequest,
         sink: UnarySink<PhysicalScanLockResponse>,
     ) {
+        info!("physical_scan_lock {:?}",req);
         let begin_instant = Instant::now_coarse();
 
         let (cb, f) = paired_future_callback();
@@ -582,6 +589,7 @@ impl<T: RaftStoreRouter<E::Local> + 'static, E: Engine, L: LockManager, Api: API
         mut req: UnsafeDestroyRangeRequest,
         sink: UnarySink<UnsafeDestroyRangeResponse>,
     ) {
+        info!("unsafe_destroy_range {:?}",req);
         let begin_instant = Instant::now_coarse();
 
         // DestroyRange is a very dangerous operation. We don't allow passing MIN_KEY as start, or
@@ -630,6 +638,7 @@ impl<T: RaftStoreRouter<E::Local> + 'static, E: Engine, L: LockManager, Api: API
         req: Request,
         mut sink: ServerStreamingSink<Response>,
     ) {
+        info!("coprocessor_stream {:?}",req);
         let begin_instant = Instant::now_coarse();
 
         let mut stream = self
@@ -668,6 +677,7 @@ impl<T: RaftStoreRouter<E::Local> + 'static, E: Engine, L: LockManager, Api: API
         stream: RequestStream<RaftMessage>,
         sink: ClientStreamingSink<Done>,
     ) {
+        info!("raft ");
         let store_id = self.store_id;
         let ch = self.ch.clone();
         let reject_messages_on_memory_ratio = self.reject_messages_on_memory_ratio;
@@ -758,6 +768,7 @@ impl<T: RaftStoreRouter<E::Local> + 'static, E: Engine, L: LockManager, Api: API
         stream: RequestStream<SnapshotChunk>,
         sink: ClientStreamingSink<Done>,
     ) {
+        info!("snapshot ");
         let task = SnapTask::Recv { stream, sink };
         if let Err(e) = self.snap_scheduler.schedule(task) {
             let err_msg = format!("{}", e);
@@ -777,6 +788,7 @@ impl<T: RaftStoreRouter<E::Local> + 'static, E: Engine, L: LockManager, Api: API
         mut req: SplitRegionRequest,
         sink: UnarySink<SplitRegionResponse>,
     ) {
+        info!("split_region ");
         forward_unary!(self.proxy, split_region, ctx, req, sink);
         let begin_instant = Instant::now_coarse();
 
@@ -870,6 +882,7 @@ impl<T: RaftStoreRouter<E::Local> + 'static, E: Engine, L: LockManager, Api: API
         req: ReadIndexRequest,
         sink: UnarySink<ReadIndexResponse>,
     ) {
+        info!("read_index ");
         forward_unary!(self.proxy, read_index, ctx, req, sink);
         let begin_instant = Instant::now_coarse();
 
@@ -967,6 +980,7 @@ impl<T: RaftStoreRouter<E::Local> + 'static, E: Engine, L: LockManager, Api: API
         stream: RequestStream<BatchCommandsRequest>,
         mut sink: DuplexSink<BatchCommandsResponse>,
     ) {
+        info!("batch_commands ");
         forward_duplex!(self.proxy, batch_commands, ctx, stream, sink);
         let (tx, rx) = unbounded(GRPC_MSG_NOTIFY_SIZE);
 
@@ -1089,6 +1103,7 @@ impl<T: RaftStoreRouter<E::Local> + 'static, E: Engine, L: LockManager, Api: API
         mut request: CheckLeaderRequest,
         sink: UnarySink<CheckLeaderResponse>,
     ) {
+        info!("check_leader {:?}",request);
         let addr = ctx.peer();
         let ts = request.get_ts();
         let leaders = request.take_regions().into();
@@ -1121,6 +1136,7 @@ impl<T: RaftStoreRouter<E::Local> + 'static, E: Engine, L: LockManager, Api: API
         mut request: StoreSafeTsRequest,
         sink: UnarySink<StoreSafeTsResponse>,
     ) {
+        info!("get_store_safe_ts {:?}",request);
         let key_range = request.take_key_range();
         let (cb, resp) = paired_future_callback();
         let check_leader_scheduler = self.check_leader_scheduler.clone();
@@ -1148,6 +1164,7 @@ impl<T: RaftStoreRouter<E::Local> + 'static, E: Engine, L: LockManager, Api: API
         _request: GetLockWaitInfoRequest,
         sink: UnarySink<GetLockWaitInfoResponse>,
     ) {
+        info!("get_lock_wait_info {:?}",_request);
         let (cb, f) = paired_future_callback();
         self.storage.dump_wait_for_entries(cb);
         let task = async move {
@@ -1314,6 +1331,7 @@ fn future_get<E: Engine, L: LockManager, Api: APIVersion>(
     storage: &Storage<E, L, Api>,
     mut req: GetRequest,
 ) -> impl Future<Output = ServerResult<GetResponse>> {
+    info!("future_get {:?}",req);
     let start = Instant::now();
     let v = storage.get(
         req.take_context(),
@@ -1355,6 +1373,7 @@ fn future_scan<E: Engine, L: LockManager, Api: APIVersion>(
     storage: &Storage<E, L, Api>,
     mut req: ScanRequest,
 ) -> impl Future<Output = ServerResult<ScanResponse>> {
+    info!("future_scan {:?}",req);
     let end_key = Key::from_raw_maybe_unbounded(req.get_end_key());
 
     let v = storage.scan(
@@ -1396,6 +1415,7 @@ fn future_batch_get<E: Engine, L: LockManager, Api: APIVersion>(
     storage: &Storage<E, L, Api>,
     mut req: BatchGetRequest,
 ) -> impl Future<Output = ServerResult<BatchGetResponse>> {
+    info!("future_batch_get {:?}",req);
     let start = Instant::now();
     let keys = req.get_keys().iter().map(|x| Key::from_raw(x)).collect();
     let v = storage.batch_get(req.take_context(), keys, req.get_version().into());
@@ -1439,6 +1459,7 @@ fn future_scan_lock<E: Engine, L: LockManager, Api: APIVersion>(
     storage: &Storage<E, L, Api>,
     mut req: ScanLockRequest,
 ) -> impl Future<Output = ServerResult<ScanLockResponse>> {
+    info!("future_scan_lock {:?}",req);
     let start_key = Key::from_raw_maybe_unbounded(req.get_start_key());
     let end_key = Key::from_raw_maybe_unbounded(req.get_end_key());
 
@@ -1475,6 +1496,7 @@ fn future_delete_range<E: Engine, L: LockManager, Api: APIVersion>(
     storage: &Storage<E, L, Api>,
     mut req: DeleteRangeRequest,
 ) -> impl Future<Output = ServerResult<DeleteRangeResponse>> {
+    info!("future_delete_range {:?}",req);
     let (cb, f) = paired_future_callback();
     let res = storage.delete_range(
         req.take_context(),
@@ -1503,6 +1525,7 @@ fn future_raw_get<E: Engine, L: LockManager, Api: APIVersion>(
     storage: &Storage<E, L, Api>,
     mut req: RawGetRequest,
 ) -> impl Future<Output = ServerResult<RawGetResponse>> {
+    info!("future_raw_get {:?}",req);
     let v = storage.raw_get(req.take_context(), req.take_cf(), req.take_key());
 
     async move {
@@ -1525,6 +1548,7 @@ fn future_raw_batch_get<E: Engine, L: LockManager, Api: APIVersion>(
     storage: &Storage<E, L, Api>,
     mut req: RawBatchGetRequest,
 ) -> impl Future<Output = ServerResult<RawBatchGetResponse>> {
+    info!("future_raw_batch_get {:?}",req);
     let keys = req.take_keys().into();
     let v = storage.raw_batch_get(req.take_context(), req.take_cf(), keys);
 
@@ -1544,6 +1568,7 @@ fn future_raw_put<E: Engine, L: LockManager, Api: APIVersion>(
     storage: &Storage<E, L, Api>,
     mut req: RawPutRequest,
 ) -> impl Future<Output = ServerResult<RawPutResponse>> {
+    info!("future_raw_put {:?}",req);
     let (cb, f) = paired_future_callback();
     let for_atomic = req.get_for_cas();
     let res = if for_atomic {
@@ -1584,6 +1609,7 @@ fn future_raw_batch_put<E: Engine, L: LockManager, Api: APIVersion>(
     storage: &Storage<E, L, Api>,
     mut req: RawBatchPutRequest,
 ) -> impl Future<Output = ServerResult<RawBatchPutResponse>> {
+    info!("future_raw_batch_put {:?}",req);
     let cf = req.take_cf();
     let pairs_len = req.get_pairs().len();
     // The TTL for each key in seconds.
@@ -1631,6 +1657,7 @@ fn future_raw_delete<E: Engine, L: LockManager, Api: APIVersion>(
     storage: &Storage<E, L, Api>,
     mut req: RawDeleteRequest,
 ) -> impl Future<Output = ServerResult<RawDeleteResponse>> {
+    info!("future_raw_delete {:?}",req);
     let (cb, f) = paired_future_callback();
     let for_atomic = req.get_for_cas();
     let res = if for_atomic {
@@ -1658,6 +1685,7 @@ fn future_raw_batch_delete<E: Engine, L: LockManager, Api: APIVersion>(
     storage: &Storage<E, L, Api>,
     mut req: RawBatchDeleteRequest,
 ) -> impl Future<Output = ServerResult<RawBatchDeleteResponse>> {
+    info!("future_raw_batch_delete {:?}",req);
     let cf = req.take_cf();
     let keys = req.take_keys().into();
     let (cb, f) = paired_future_callback();
@@ -1687,6 +1715,7 @@ fn future_raw_scan<E: Engine, L: LockManager, Api: APIVersion>(
     storage: &Storage<E, L, Api>,
     mut req: RawScanRequest,
 ) -> impl Future<Output = ServerResult<RawScanResponse>> {
+    info!("future_raw_scan {:?}",req);
     let end_key = if req.get_end_key().is_empty() {
         None
     } else {
@@ -1718,6 +1747,7 @@ fn future_raw_batch_scan<E: Engine, L: LockManager, Api: APIVersion>(
     storage: &Storage<E, L, Api>,
     mut req: RawBatchScanRequest,
 ) -> impl Future<Output = ServerResult<RawBatchScanResponse>> {
+    info!("future_raw_batch_scan {:?}",req);
     let v = storage.raw_batch_scan(
         req.take_context(),
         req.take_cf(),
@@ -1743,6 +1773,7 @@ fn future_raw_delete_range<E: Engine, L: LockManager, Api: APIVersion>(
     storage: &Storage<E, L, Api>,
     mut req: RawDeleteRangeRequest,
 ) -> impl Future<Output = ServerResult<RawDeleteRangeResponse>> {
+    info!("future_raw_delete_range {:?}",req);
     let (cb, f) = paired_future_callback();
     let res = storage.raw_delete_range(
         req.take_context(),
@@ -1771,6 +1802,7 @@ fn future_raw_get_key_ttl<E: Engine, L: LockManager, Api: APIVersion>(
     storage: &Storage<E, L, Api>,
     mut req: RawGetKeyTtlRequest,
 ) -> impl Future<Output = ServerResult<RawGetKeyTtlResponse>> {
+    info!("future_raw_get_key_ttl {:?}",req);
     let v = storage.raw_get_key_ttl(req.take_context(), req.take_cf(), req.take_key());
 
     async move {
@@ -1793,6 +1825,7 @@ fn future_raw_compare_and_swap<E: Engine, L: LockManager, Api: APIVersion>(
     storage: &Storage<E, L, Api>,
     mut req: RawCasRequest,
 ) -> impl Future<Output = ServerResult<RawCasResponse>> {
+    info!("future_raw_compare_and_swap {:?}",req);
     let (cb, f) = paired_future_callback();
     let previous_value = if req.get_previous_not_exist() {
         None
@@ -1837,6 +1870,7 @@ fn future_raw_checksum<E: Engine, L: LockManager, Api: APIVersion>(
     storage: &Storage<E, L, Api>,
     mut req: RawChecksumRequest,
 ) -> impl Future<Output = ServerResult<RawChecksumResponse>> {
+    info!("future_raw_checksum {:?}",req);
     let f = storage.raw_checksum(
         req.take_context(),
         req.get_algorithm(),
@@ -1885,6 +1919,7 @@ macro_rules! txn_command_future {
             storage: &Storage<E, L, Api>,
             $req: $req_ty,
         ) -> impl Future<Output = ServerResult<$resp_ty>> {
+            info!("$fn_name {:?}",$req);
             $prelude
             let (cb, f) = paired_future_callback();
             let res = storage.sched_txn_command($req.into(), cb);

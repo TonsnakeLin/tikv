@@ -196,6 +196,7 @@ impl<S: EngineSnapshot> MvccReader<S> {
 
     pub fn load_lock(&mut self, key: &Key) -> Result<Option<Lock>> {
         if let Some(pessimistic_lock) = self.load_in_memory_pessimistic_lock(key)? {
+            info!("load_lock pessimistic_lock {:?}", pessimistic_lock);
             return Ok(Some(pessimistic_lock));
         }
 
@@ -215,7 +216,8 @@ impl<S: EngineSnapshot> MvccReader<S> {
                 None => None,
             }
         };
-
+        
+        info!("load_lock lock {:?}", res.as_ref().unwrap());
         Ok(res)
     }
 
