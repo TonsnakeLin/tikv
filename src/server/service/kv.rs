@@ -1918,8 +1918,9 @@ macro_rules! txn_command_future {
         fn $fn_name<E: Engine, L: LockManager, Api: APIVersion>(
             storage: &Storage<E, L, Api>,
             $req: $req_ty,
-        ) -> impl Future<Output = ServerResult<$resp_ty>> {
-            info!("$fn_name {:?}",$req);
+        ) -> impl Future<Output = ServerResult<$resp_ty>> {  
+            let type_name = std::any::type_name::<$req_ty>(); 
+            info!("{:?} {:?}", type_name, $req);        
             $prelude
             let (cb, f) = paired_future_callback();
             let res = storage.sched_txn_command($req.into(), cb);
@@ -1949,7 +1950,7 @@ txn_command_future!(future_prewrite, PrewriteRequest, PrewriteResponse, (v, resp
         resp.set_min_commit_ts(v.min_commit_ts.into_inner());
         resp.set_one_pc_commit_ts(v.one_pc_commit_ts.into_inner());
     }
-    resp.set_errors(extract_key_errors(v.map(|v| v.locks)).into());
+    resp.set_errors(extract_key_errors(v.map(|v| v.locks)).into());    
 }});
 txn_command_future!(future_acquire_pessimistic_lock, PessimisticLockRequest, PessimisticLockResponse, (v, resp) {
     match v {

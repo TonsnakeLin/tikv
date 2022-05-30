@@ -489,8 +489,7 @@ impl<K: PrewriteKind> Prewriter<K> {
         }
 
         // If there are other errors, return other error prior to `AssertionFailed`.
-        let mut assertion_failure = None;
-
+        let mut assertion_failure = None;   
         for m in mem::take(&mut self.mutations) {
             let is_pessimistic_lock = m.is_pessimistic_lock();
             let m = m.into_mutation();
@@ -503,6 +502,7 @@ impl<K: PrewriteKind> Prewriter<K> {
             }
 
             let need_min_commit_ts = secondaries.is_some() || self.try_one_pc;
+            info!("perwrite all {:?} {:?}", txn, key);
             let prewrite_result =
                 prewrite(txn, reader, &props, m, secondaries, is_pessimistic_lock);
             match prewrite_result {
@@ -521,9 +521,11 @@ impl<K: PrewriteKind> Prewriter<K> {
                     conflict_commit_ts,
                     ..
                 })) if conflict_commit_ts > start_ts => {
+                    info!("perwrite key return WriteConflict and  conflict_commit_ts > start_ts {:?} {:?}", txn, key);
                     return check_committed_record_on_err(prewrite_result, txn, reader, &key);
                 }
                 Err(MvccError(box MvccErrorInner::PessimisticLockNotFound { .. })) => {
+                    info!("perwrite key return PessimisticLockNotFound {:?} {:?}", txn, key);
                     return check_committed_record_on_err(prewrite_result, txn, reader, &key);
                 }
                 Err(MvccError(box MvccErrorInner::CommitTsTooLarge { .. })) | Ok((..)) => {
@@ -536,25 +538,31 @@ impl<K: PrewriteKind> Prewriter<K> {
                     // release memory locks
                     txn.guards = Vec::new();
                     final_min_commit_ts = TimeStamp::zero();
+                    info!("perwrite key return CommitTsTooLarge {:?} {:?}", txn, key);
                 }
                 Err(MvccError(box MvccErrorInner::KeyIsLocked { .. })) => {
+                    info!("perwrite key return KeyIsLocked {:?} {:?}", txn, key);
                     match check_committed_record_on_err(prewrite_result, txn, reader, &key) {
                         Ok(res) => return Ok(res),
                         Err(e) => locks.push(Err(e.into())),
                     }
                 }
                 Err(e @ MvccError(box MvccErrorInner::AssertionFailed { .. })) => {
+                    info!("perwrite key return AssertionFailed {:?} {:?}", txn, key);
                     if assertion_failure.is_none() {
                         assertion_failure = Some(e);
                     }
                 }
-                Err(e) => return Err(Error::from(e)),
+                Err(e) => {
+                    info!("perwrite key return AssertionFailed {:?} {:?} {:?}", txn, key, e);
+                    return Err(Error::from(e));
+                }
             }
         }
 
         if let Some(e) = assertion_failure {
             return Err(Error::from(e));
-        }
+        }        
         Ok((locks, final_min_commit_ts))
     }
 
