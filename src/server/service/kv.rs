@@ -366,7 +366,7 @@ impl<T: RaftStoreRouter<E::Local> + 'static, E: Engine, L: LockManager, Api: API
 
     fn coprocessor(&mut self, ctx: RpcContext<'_>, req: Request, sink: UnarySink<Response>) {
         forward_unary!(self.proxy, coprocessor, ctx, req, sink);
-        info!("coprocessor {:?}",req);
+        info!("hxhxhyhy coprocessor {:?}",req);
         let begin_instant = Instant::now_coarse();
         let future = future_copr(&self.copr, Some(ctx.peer()), req);
         let task = async move {
@@ -1223,7 +1223,7 @@ fn handle_batch_commands_request<E: Engine, L: LockManager, Api: APIVersion>(
             }
         };
     }
-
+    info!("handle_batch_commands_request {:?}", req);
     macro_rules! handle_cmd {
         ($($cmd: ident, $future_fn: ident ( $($arg: expr),* ), $metric_name: ident;)*) => {
             match req.cmd {
@@ -1900,6 +1900,7 @@ fn future_copr<E: Engine>(
     peer: Option<String>,
     req: Request,
 ) -> impl Future<Output = ServerResult<MemoryTraceGuard<Response>>> {
+    info!("hxhxhyhy future_copr {:?}", req);
     let ret = copr.parse_and_handle_unary_request(req, peer);
     async move { Ok(ret.await) }
 }
@@ -1909,6 +1910,7 @@ fn future_raw_coprocessor<E: Engine, L: LockManager, Api: APIVersion>(
     storage: &Storage<E, L, Api>,
     req: RawCoprocessorRequest,
 ) -> impl Future<Output = ServerResult<RawCoprocessorResponse>> {
+    info!("future_raw_coprocessor {:?}", req);
     let ret = copr_v2.handle_request(storage, req);
     async move { Ok(ret.await) }
 }
