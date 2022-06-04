@@ -483,7 +483,7 @@ where
         let region_id = cmd.request.get_header().get_region_id();
         let mut err = errorpb::Error::default();
         info!("LocalReader::redirect RaftCmdRequest {:?}", cmd.request);
-        info!("LocalReader.router type {:?}", std::any::type_name_of_val(&self.router));
+        // info!("LocalReader.router type {:?}", std::any::type_name_of_val(&self.router));
         match ProposalRouter::send(&self.router, cmd) {
             Ok(()) => return,
             Err(TrySendError::Full(c)) => {
