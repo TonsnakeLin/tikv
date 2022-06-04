@@ -85,6 +85,7 @@ use crate::Result;
 use concurrency_manager::ConcurrencyManager;
 use resource_metering::CollectorRegHandle;
 use tikv_util::future::poll_future_notify;
+use std::thread;
 
 type Key = Vec<u8>;
 
@@ -736,7 +737,7 @@ impl<EK: KvEngine, ER: RaftEngine, T: Transport> PollHandler<PeerFsm<EK, ER>, St
         while self.store_msg_buf.len() < self.messages_per_tick {
             match store.receiver.try_recv() {
                 Ok(msg) => { 
-                    info("the_name {:?} threadid {:?}, RaftPoller handle_control, msg {:?}", thread::current().name(), thread::current().id(), msg);
+                    info!("the_name {:?} threadid {:?}, RaftPoller handle_control, msg {:?}", thread::current().name(), thread::current().id(), msg);
                     self.store_msg_buf.push(msg);
                 }
                 Err(TryRecvError::Empty) => {
@@ -780,7 +781,7 @@ impl<EK: KvEngine, ER: RaftEngine, T: Transport> PollHandler<PeerFsm<EK, ER>, St
             match peer.receiver.try_recv() {
                 // TODO: we may need a way to optimize the message copy.
                 Ok(msg) => {
-                    info("thd_name {:?} threadid {:?}, RaftPoller handle_normal, msg {:?}", thread::current().name(), thread::current().id(), msg);
+                    info!("thd_name {:?} threadid {:?}, RaftPoller handle_normal, msg {:?}", thread::current().name(), thread::current().id(), msg);
                     fail_point!(
                         "pause_on_peer_destroy_res",
                         peer.peer_id() == 1
