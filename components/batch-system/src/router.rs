@@ -13,6 +13,7 @@ use std::sync::{Arc, Mutex};
 use tikv_util::lru::LruCache;
 use tikv_util::Either;
 use tikv_util::{debug, info};
+use std::thread;
 
 /// A struct that traces the approximate memory usage of router.
 #[derive(Default)]
