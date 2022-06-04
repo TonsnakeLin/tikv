@@ -416,7 +416,7 @@ where
         fail_point!("raftkv_async_snapshot_err", |_| Err(box_err!(
             "injected error for async_snapshot"
         )));
-
+        info!("RaftKV async_snapshot start_ts {:?} key_rangs {:?}", ctx.start_ts, ctx.key_ranges);
         let mut req = Request::default();
         req.set_cmd_type(CmdType::Snap);
         if !ctx.key_ranges.is_empty() && !ctx.start_ts.is_zero() {

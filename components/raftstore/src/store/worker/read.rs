@@ -482,7 +482,8 @@ where
         debug!("localreader redirects command"; "command" => ?cmd);
         let region_id = cmd.request.get_header().get_region_id();
         let mut err = errorpb::Error::default();
-        info!("LocalReader::redirect";"region_id"=>%region_id);
+        info!("LocalReader::redirect RaftCmdRequest {:?}", cmd.request);
+        info!("LocalReader.router type {:?}", std::any::type_name_of_val(&x));
         match ProposalRouter::send(&self.router, cmd) {
             Ok(()) => return,
             Err(TrySendError::Full(c)) => {
@@ -623,10 +624,11 @@ where
         cb: Callback<E::Snapshot>,
     ) {
         match self.pre_propose_raft_command(&req) {
-            Ok(Some((delegate, policy))) => {
+            Ok(Some((delegate, policy))) => {                
                 let mut response = match policy {
                     // Leader can read local if and only if it is in lease.
                     RequestPolicy::ReadLocal => {
+                        info!("LocalReader::propose_raft_command ReadLocal RaftCmdRequest {:?}", req);
                         let snapshot_ts = match read_id.as_mut() {
                             // If this peer became Leader not long ago and just after the cached
                             // snapshot was created, this snapshot can not see all data of the peer.
@@ -654,6 +656,7 @@ where
                     }
                     // Replica can serve stale read if and only if its `safe_ts` >= `read_ts`
                     RequestPolicy::StaleRead => {
+                        info!("LocalReader::propose_raft_command StaleRead RaftCmdRequest {:?}", req);
                         let read_ts = decode_u64(&mut req.get_header().get_flag_data()).unwrap();
                         assert!(read_ts > 0);
                         if let Err(resp) =

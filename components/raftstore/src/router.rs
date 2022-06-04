@@ -253,7 +253,7 @@ impl<EK: KvEngine, ER: RaftEngine> LocalReadRouter<EK> for ServerRaftStoreRouter
         req: RaftCmdRequest,
         cb: Callback<EK::Snapshot>,
     ) -> RaftStoreResult<()> {
-        info!("ServerRaftStoreRouter::read {}", ServerRaftStoreRouter::<EK, ER>::type_name());
+        info!("ServerRaftStoreRouter::read {}", req);
         let mut local_reader = self.local_reader.borrow_mut();
         local_reader.read(read_id, req, cb);
         Ok(())

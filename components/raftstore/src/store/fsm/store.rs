@@ -283,7 +283,7 @@ where
         cmd: RaftCommand<EK::Snapshot>,
     ) -> std::result::Result<(), TrySendError<RaftCommand<EK::Snapshot>>> {
         let region_id = cmd.request.get_header().get_region_id();
-        info!("RaftRouter::send_raft_command");
+        info!("thd_name {:?} threadid {:?}, RaftRouter::send_raft_command {:?}", thread::current().name(),thread::current().id(), cmd.request);
         match self.send(region_id, PeerMsg::RaftCommand(cmd)) {
             Ok(()) => Ok(()),
             Err(TrySendError::Full(PeerMsg::RaftCommand(cmd))) => Err(TrySendError::Full(cmd)),
@@ -735,7 +735,10 @@ impl<EK: KvEngine, ER: RaftEngine, T: Transport> PollHandler<PeerFsm<EK, ER>, St
         let mut expected_msg_count = None;
         while self.store_msg_buf.len() < self.messages_per_tick {
             match store.receiver.try_recv() {
-                Ok(msg) => self.store_msg_buf.push(msg),
+                Ok(msg) => { 
+                    info("the_name {:?} threadid {:?}, RaftPoller handle_control, msg {:?}", thread::current().name(), thread::current().id(), msg);
+                    self.store_msg_buf.push(msg);
+                }
                 Err(TryRecvError::Empty) => {
                     expected_msg_count = Some(0);
                     break;
@@ -777,6 +780,7 @@ impl<EK: KvEngine, ER: RaftEngine, T: Transport> PollHandler<PeerFsm<EK, ER>, St
             match peer.receiver.try_recv() {
                 // TODO: we may need a way to optimize the message copy.
                 Ok(msg) => {
+                    info("thd_name {:?} threadid {:?}, RaftPoller handle_normal, msg {:?}", thread::current().name(), thread::current().id(), msg);
                     fail_point!(
                         "pause_on_peer_destroy_res",
                         peer.peer_id() == 1
