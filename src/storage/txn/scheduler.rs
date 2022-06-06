@@ -65,6 +65,7 @@ use crate::storage::{
     get_priority_tag, kv::FlowStatsReporter, types::StorageCallback, Error as StorageError,
     ErrorInner as StorageErrorInner,
 };
+use std::thread;
 
 const TASKS_SLOTS_NUM: usize = 1 << 12; // 4096 slots.
 
@@ -509,7 +510,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                 match unsafe { with_tls_engine(|engine: &E| kv::snapshot(engine, snap_ctx)) }.await
                 {
                     Ok(snapshot) => {
-                        info!("the_name {:?} threadid {:?}, snapshot has got", thread::current().name(), thread::current().id());
+                        info!("thd_name {:?} threadid {:?}, snapshot has got", thread::current().name(), thread::current().id());
                         SCHED_STAGE_COUNTER_VEC.get(tag).snapshot_ok.inc();
                         let term = snapshot.ext().get_term();
                         let extra_op = snapshot.ext().get_txn_extra_op();

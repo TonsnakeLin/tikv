@@ -14,6 +14,7 @@ use kvproto::errorpb::{self, EpochNotMatch, StaleCommand};
 use kvproto::kvrpcpb::Context;
 use tikv_kv::SnapshotExt;
 use txn_types::{Key, Lock, OldValue, TimeStamp, Value, Write, WriteRef, WriteType};
+use std::thread;
 
 /// Read from an MVCC snapshot, i.e., a logical view of the database at a specific timestamp (the
 /// start_ts).
@@ -205,24 +206,24 @@ impl<S: EngineSnapshot> MvccReader<S> {
         }
 
         let res = if let Some(ref mut cursor) = self.lock_cursor {
+            info!("thd_name load_lock from lock_cursor");
             match cursor.get(key, &mut self.statistics.lock)? {
                 Some(v) => Some(Lock::parse(v)?),
                 None => None,
-            }
-            info!("thd_name {:?} load_lock from lock_cursor");
+            }            
         } else {
+            info!("thd_name load_lock from snapshot");
             self.statistics.lock.get += 1;
             match self.snapshot.get_cf(CF_LOCK, key)? {
                 Some(v) => Some(Lock::parse(&v)?),
                 None => None,
-            }
-            info!("thd_name {:?} load_lock from snapshot");
+            }            
         };
         let tmp = &res;
         if let Some(tmp_lock) = tmp {
             info!("thd_name {:?} load_lock lock {:?} {:?}",thread::current().name(), key, tmp_lock);
         } else {
-            info!("thd_name {:?} load_lock doesnt found a lock");
+            info!("thd_name load_lock doesnt found a lock");
         }        
         Ok(res)
     }
@@ -236,7 +237,7 @@ impl<S: EngineSnapshot> MvccReader<S> {
                 // Instead, just return a StaleCommand or EpochNotMatch error, so the
                 // client will not receive a false error because the lock table has been
                 // cleared.
-                info("thd_name {:?}, pessimistic_locks {:?}", thread::current().name(), txn_ext.pessimistic_locks.data_ptr());
+                info!("thd_name {:?}, pessimistic_locks {:?}", thread::current().name(), txn_ext.pessimistic_locks.data_ptr());
                 let locks = txn_ext.pessimistic_locks.read();
                 if self.term != 0 && locks.term != self.term {
                     let mut err = errorpb::Error::default();

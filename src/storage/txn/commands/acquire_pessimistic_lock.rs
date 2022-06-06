@@ -18,6 +18,7 @@ use crate::storage::{
     Error as StorageError, ErrorInner as StorageErrorInner, PessimisticLockRes, ProcessResult,
     Result as StorageResult, Snapshot,
 };
+use std::thread;
 
 command! {
     /// Acquire a Pessimistic lock on the keys.
@@ -85,7 +86,7 @@ fn get_PessimisticLockRes(pes_lock_res: &PessimisticLockRes) -> &str {
 
 impl<S: Snapshot, L: LockManager> WriteCommand<S, L> for AcquirePessimisticLock {
     fn process_write(mut self, snapshot: S, context: WriteContext<'_, L>) -> Result<WriteResult> {
-        info!("the_name {:?} threadid {:?}, AcquirePessimisticLock::process_write, kes {:?}", thread::current().name(), thread::current().id(), self.keys);
+        info!("thd_name {:?} threadid {:?}, AcquirePessimisticLock::process_write, kes {:?}", thread::current().name(), thread::current().id(), self.keys);
         let (start_ts, ctx, keys) = (self.start_ts, self.ctx, self.keys);
         let mut txn = MvccTxn::new(start_ts, context.concurrency_manager);
         let mut reader = ReaderWithStats::new(
