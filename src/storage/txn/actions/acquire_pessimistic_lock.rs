@@ -44,6 +44,8 @@ pub fn acquire_pessimistic_lock<S: Snapshot>(
     // and `need_old_value` are both set, we also load the value even if `need_value` is false,
     // so that it avoids `load_old_value` doing repeated work.
     let need_load_value = need_value || (need_check_existence && need_old_value);
+    info!("the_name {:?} acquire_pessimistic_lock should_not_exist {:?} need_value {:?}, need_check_existence {:?}, need_old_value {:?}", 
+    thread::current().name(), should_not_exist, need_value, need_check_existence, need_old_value);
 
     fn load_old_value<S: Snapshot>(
         need_old_value: bool,

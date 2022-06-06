@@ -196,7 +196,7 @@ impl<S: EngineSnapshot> MvccReader<S> {
 
     pub fn load_lock(&mut self, key: &Key) -> Result<Option<Lock>> {
         if let Some(pessimistic_lock) = self.load_in_memory_pessimistic_lock(key)? {
-            info!("load_lock pessimistic_lock {:?} {:?}", key, pessimistic_lock);
+            info!("thd_name {:?} load_lock pessimistic_lock {:?} {:?}", thread::current().name(), key, pessimistic_lock);
             return Ok(Some(pessimistic_lock));
         }
 
@@ -209,16 +209,20 @@ impl<S: EngineSnapshot> MvccReader<S> {
                 Some(v) => Some(Lock::parse(v)?),
                 None => None,
             }
+            info!("thd_name {:?} load_lock from lock_cursor");
         } else {
             self.statistics.lock.get += 1;
             match self.snapshot.get_cf(CF_LOCK, key)? {
                 Some(v) => Some(Lock::parse(&v)?),
                 None => None,
             }
+            info!("thd_name {:?} load_lock from snapshot");
         };
         let tmp = &res;
         if let Some(tmp_lock) = tmp {
-            info!("load_lock lock {:?} {:?}", key, tmp_lock);
+            info!("thd_name {:?} load_lock lock {:?} {:?}",thread::current().name(), key, tmp_lock);
+        } else {
+            info!("thd_name {:?} load_lock doesnt found a lock");
         }        
         Ok(res)
     }
@@ -232,6 +236,7 @@ impl<S: EngineSnapshot> MvccReader<S> {
                 // Instead, just return a StaleCommand or EpochNotMatch error, so the
                 // client will not receive a false error because the lock table has been
                 // cleared.
+                info("thd_name {:?}, pessimistic_locks {:?}", thread::current().name(), txn_ext.pessimistic_locks.data_ptr());
                 let locks = txn_ext.pessimistic_locks.read();
                 if self.term != 0 && locks.term != self.term {
                     let mut err = errorpb::Error::default();

@@ -509,6 +509,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                 match unsafe { with_tls_engine(|engine: &E| kv::snapshot(engine, snap_ctx)) }.await
                 {
                     Ok(snapshot) => {
+                        info!("the_name {:?} threadid {:?}, snapshot has got", thread::current().name(), thread::current().id());
                         SCHED_STAGE_COUNTER_VEC.get(tag).snapshot_ok.inc();
                         let term = snapshot.ext().get_term();
                         let extra_op = snapshot.ext().get_txn_extra_op();
@@ -535,6 +536,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                         sched.process(snapshot, task).await;
                     }
                     Err(err) => {
+                        info!("the_name {:?} threadid {:?}, get snapshot failed", thread::current().name(), thread::current().id());
                         SCHED_STAGE_COUNTER_VEC.get(tag).snapshot_err.inc();
 
                         info!("get snapshot failed"; "cid" => task.cid, "err" => ?err);
@@ -679,6 +681,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
 
     /// Process the task in the current thread.
     async fn process(self, snapshot: E::Snap, task: Task) {
+        info!("the_name {:?} threadid {:?}, Scheduler::process, task {:?}", thread::current().name(), thread::current().id(), task.cmd);
         if self.check_task_deadline_exceeded(&task) {
             return;
         }
@@ -763,6 +766,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
         let pipelined =
             task.cmd.can_be_pipelined() && pessimistic_lock_mode == PessimisticLockMode::Pipelined;
         let txn_ext = snapshot.ext().get_txn_ext().cloned();
+        info!("the_name {:?} threadid {:?}, Scheduler::process_write, task {:?}, pipelined {:?}", thread::current().name(), thread::current().id(), task.cmd, pipelined);
 
         let deadline = task.cmd.deadline();
         let write_result = {
@@ -833,16 +837,18 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                 key,
                 resource_group_tag: ctx.get_resource_group_tag().into(),
             };
+            info!("thd_name {:?} threadid {:?}, Scheduler::process_write, wait_for_lock", thread::current().name(), thread::current().id());
             scheduler.on_wait_for_lock(cid, ts, pr, lock, is_first_lock, wait_timeout, diag_ctx);
             return;
         }
-
+        info!("thd_name {:?} threadid {:?}, Scheduler::process_write, to_be_write.modifies {:?}", thread::current().name(), thread::current().id(), to_be_write.modifies.is_empty());
         let mut pr = Some(pr);
         if to_be_write.modifies.is_empty() {
             scheduler.on_write_finished(cid, pr, Ok(()), lock_guards, false, false, tag);
             return;
         }
 
+        info!("Scheduler::process_write, to_be_write {:?}", to_be_write.modifies);
         if tag == CommandKind::acquire_pessimistic_lock
             && pessimistic_lock_mode == PessimisticLockMode::InMemory
             && self.try_write_in_memory_pessimistic_locks(
@@ -851,6 +857,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                 &ctx,
             )
         {
+            info!("Scheduler::process_write try_write_in_memory_pessimistic_locks");
             // Safety: `self.sched_pool` ensures a TLS engine exists.
             unsafe {
                 with_tls_engine(|engine: &E| {
@@ -1078,8 +1085,12 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
     ) -> bool {
         let txn_ext = match txn_ext {
             Some(txn_ext) => txn_ext,
-            None => return false,
+            None => {
+                info!("try_write_in_memory_pessimistic_locks has not txn_ext");
+                return false;
+            }
         };
+        info!("try_write_in_memory_pessimistic_locks to_be_write {:?}", to_be_write.modifies);
         let mut pessimistic_locks = txn_ext.pessimistic_locks.write();
         // When not writable, it only means we cannot write locks to the in-memory lock table,
         // but it is still possible for the region to propose request.

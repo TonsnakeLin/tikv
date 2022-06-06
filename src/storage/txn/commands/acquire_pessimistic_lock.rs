@@ -73,8 +73,19 @@ fn extract_lock_info_from_result<T>(res: &StorageResult<T>) -> &LockInfo {
     }
 }
 
+/* 
+fn get_PessimisticLockRes(pes_lock_res: &PessimisticLockRes) -> &str {
+    match pes_lock_res {
+        Values=> "Values",
+        Existence=> "Existence",
+        Empty => "Empty",
+    }
+}
+*/
+
 impl<S: Snapshot, L: LockManager> WriteCommand<S, L> for AcquirePessimisticLock {
     fn process_write(mut self, snapshot: S, context: WriteContext<'_, L>) -> Result<WriteResult> {
+        info!("the_name {:?} threadid {:?}, AcquirePessimisticLock::process_write, kes {:?}", thread::current().name(), thread::current().id(), self.keys);
         let (start_ts, ctx, keys) = (self.start_ts, self.ctx, self.keys);
         let mut txn = MvccTxn::new(start_ts, context.concurrency_manager);
         let mut reader = ReaderWithStats::new(
@@ -92,8 +103,9 @@ impl<S: Snapshot, L: LockManager> WriteCommand<S, L> for AcquirePessimisticLock 
         } else {
             Ok(PessimisticLockRes::Empty)
         };
+        
         let need_old_value = context.extra_op == ExtraOp::ReadOldValue;
-        for (k, should_not_exist) in keys {
+        for (k, should_not_exist) in keys {           
             match acquire_pessimistic_lock(
                 &mut txn,
                 &mut reader,
@@ -120,9 +132,13 @@ impl<S: Snapshot, L: LockManager> WriteCommand<S, L> for AcquirePessimisticLock 
                 }
                 Err(e @ MvccError(box MvccErrorInner::KeyIsLocked { .. })) => {
                     res = Err(e).map_err(Error::from).map_err(StorageError::from);
+                    info!("AcquirePessimisticLock::process_write, acquire_pessimistic_lock error, break {:?}", "MvccErrorInner::KeyIsLocked");
                     break;
                 }
-                Err(e) => return Err(Error::from(e)),
+                Err(e) => {
+                    info!("AcquirePessimisticLock::process_write, acquire_pessimistic_lock error, break {:?}", Error::from(e));
+                    return Err(Error::from(e));
+                }
             }
         }
 
@@ -130,9 +146,11 @@ impl<S: Snapshot, L: LockManager> WriteCommand<S, L> for AcquirePessimisticLock 
         match &res {
             Ok(PessimisticLockRes::Values(values)) if !values.is_empty() => {
                 txn.concurrency_manager.update_max_ts(self.for_update_ts);
+                info!("AcquirePessimisticLock::process_write, PessimisticLockRes {:?}", "PessimisticLockRes::Values");
             }
             Ok(PessimisticLockRes::Existence(values)) if !values.is_empty() => {
                 txn.concurrency_manager.update_max_ts(self.for_update_ts);
+                info!("AcquirePessimisticLock::process_write, PessimisticLockRes {:?}", "PessimisticLockRes::Existence");
             }
             _ => (),
         }
@@ -147,7 +165,7 @@ impl<S: Snapshot, L: LockManager> WriteCommand<S, L> for AcquirePessimisticLock 
             };
             let write_data = WriteData::new(txn.into_modifies(), extra);
             (pr, write_data, rows, ctx, None)
-        } else {
+        } else {            
             let lock_info_pb = extract_lock_info_from_result(&res);
             let lock_info = WriteResultLockInfo::from_lock_info_pb(
                 lock_info_pb,
