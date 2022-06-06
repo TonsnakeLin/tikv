@@ -137,8 +137,9 @@ impl<S: Snapshot, L: LockManager> WriteCommand<S, L> for AcquirePessimisticLock 
                     break;
                 }
                 Err(e) => {
-                    info!("AcquirePessimisticLock::process_write, acquire_pessimistic_lock error, break {:?}", Error::from(e));
-                    return Err(Error::from(e));
+                    let tmp = Error::from(e);
+                    info!("AcquirePessimisticLock::process_write, acquire_pessimistic_lock error, break {:?}", tmp);
+                    return Err(tmp);
                 }
             }
         }
