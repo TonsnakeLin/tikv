@@ -8,6 +8,7 @@ use crate::storage::mvcc::{
 use crate::storage::txn::actions::check_data_constraint::check_data_constraint;
 use crate::storage::Snapshot;
 use txn_types::{Key, LockType, OldValue, PessimisticLock, TimeStamp, Value, Write, WriteType};
+use std::thread;
 
 /// Acquires pessimistic lock on a single key. Optionally reads the previous value by the way.
 ///
