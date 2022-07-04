@@ -26,6 +26,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use std::{mem, u64};
+use std::thread;
 
 use collections::HashMap;
 use concurrency_manager::{ConcurrencyManager, KeyHandleGuard};
@@ -598,6 +599,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
         async_apply_prewrite: bool,
         tag: metrics::CommandKind,
     ) {
+        info!("thd_name {:?}, on_write_finished, cid {:?}, pr {:?}", thread::current().name(), cid, pr);
         // TODO: Does async apply prewrite worth a special metric here?
         if pipelined {
             SCHED_STAGE_COUNTER_VEC
@@ -720,6 +722,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
             } else {
                 self.process_write(snapshot, task, &mut statistics).await;
             };
+            info!("the_name {:?} threadid {:?}, Scheduler::process finished , task {:?}", thread::current().name(), thread::current().id(), task.cmd);
             tls_collect_scan_details(tag.get_str(), &statistics);
             let elapsed = timer.saturating_elapsed();
             slow_log!(
@@ -842,14 +845,14 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
             scheduler.on_wait_for_lock(cid, ts, pr, lock, is_first_lock, wait_timeout, diag_ctx);
             return;
         }
-        info!("thd_name {:?} threadid {:?}, Scheduler::process_write, to_be_write.modifies {:?}", thread::current().name(), thread::current().id(), to_be_write.modifies.is_empty());
+        info!("thd_name {:?} threadid {:?}, Scheduler::process_write, to_be_write.modifies.empty {:?}", thread::current().name(), thread::current().id(), to_be_write.modifies.is_empty());
         let mut pr = Some(pr);
         if to_be_write.modifies.is_empty() {
             scheduler.on_write_finished(cid, pr, Ok(()), lock_guards, false, false, tag);
             return;
         }
 
-        info!("Scheduler::process_write, to_be_write {:?}", to_be_write.modifies);
+        info!("thd_name {:?} Scheduler::process_write, to_be_write_1 {:?}", thread::current().name(), to_be_write.modifies);
         if tag == CommandKind::acquire_pessimistic_lock
             && pessimistic_lock_mode == PessimisticLockMode::InMemory
             && self.try_write_in_memory_pessimistic_locks(
@@ -1003,6 +1006,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
             }
             _ => vec![],
         };
+        info!("thd_name {:?} Scheduler::process_write,removed_pessimistic_locks {:?}, cid {:?}", thread::current().name(), removed_pessimistic_locks, cid);
         // Keep the read lock guard of the pessimistic lock table until the request is sent to the raftstore.
         //
         // If some in-memory pessimistic locks need to be proposed, we will propose another TransferLeader

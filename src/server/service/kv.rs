@@ -2,6 +2,7 @@
 
 // #[PerformanceCriticalPath]: Tikv gRPC APIs implementation
 use std::sync::Arc;
+use std::thread;
 use tikv_util::time::{duration_to_ms, duration_to_sec, Instant};
 
 use super::batch::{BatcherBuilder, ReqBatcher};
@@ -1922,7 +1923,7 @@ macro_rules! txn_command_future {
             $req: $req_ty,
         ) -> impl Future<Output = ServerResult<$resp_ty>> {  
             let type_name = std::any::type_name::<$req_ty>(); 
-            info!("{:?} {:?}", type_name, $req);        
+            info!("thd_name {:?}, {:?} {:?}", std::thread::current().name(), type_name, $req);        
             $prelude
             let (cb, f) = paired_future_callback();
             let res = storage.sched_txn_command($req.into(), cb);
