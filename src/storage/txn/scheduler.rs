@@ -683,7 +683,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
 
     /// Process the task in the current thread.
     async fn process(self, snapshot: E::Snap, task: Task) {
-        let task_id = &task.cid;
+        let task_id = (&task.cid).to_owned();
         info!("the_name {:?} threadid {:?}, Scheduler::process, task {:?}", thread::current().name(), thread::current().id(), &task.cmd);
         if self.check_task_deadline_exceeded(&task) {
             return;
