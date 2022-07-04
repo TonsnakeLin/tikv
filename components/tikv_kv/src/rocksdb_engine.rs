@@ -166,6 +166,7 @@ impl RocksEngine {
             .collect::<Vec<_>>();
         let mut cmd_req = raft_cmdpb::RaftCmdRequest::default();
         cmd_req.set_requests(requests.into());
+        info!("thd_name {:?}, pre_propose function, RaftCmdRequest {:?}", std::thread::current().name(), cmd_req);
 
         let mut region = metapb::Region::default();
         region.set_id(1);
@@ -227,7 +228,7 @@ impl Engine for RocksEngine {
         committed_cb: Option<ExtCallback>,
     ) -> Result<()> {
         fail_point!("rockskv_async_write", |_| Err(box_err!("write failed")));
-
+        info!("thd_name {:?}, async_write_ext, WriteData {:?}", thread::current().name(), batch.modifies);
         if batch.modifies.is_empty() {
             return Err(Error::from(ErrorInner::EmptyRequest));
         }

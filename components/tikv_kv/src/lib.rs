@@ -594,7 +594,7 @@ pub fn drop_snapshot_callback<E: Engine>() -> Result<E::Snap> {
 /// Write modifications into a `BaseRocksEngine` instance.
 pub fn write_modifies(kv_engine: &impl LocalEngine, modifies: Vec<Modify>) -> Result<()> {
     fail_point!("rockskv_write_modifies", |_| Err(box_err!("write failed")));
-
+    info!("thd_name {:?}, write_modifies, modifies {:?}", std::thread::current().name(), modifies);
     let mut wb = kv_engine.write_batch();
     for rev in modifies {
         let res = match rev {
