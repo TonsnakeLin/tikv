@@ -683,6 +683,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
 
     /// Process the task in the current thread.
     async fn process(self, snapshot: E::Snap, task: Task) {
+        let task_id = &task.cid;
         info!("the_name {:?} threadid {:?}, Scheduler::process, task {:?}", thread::current().name(), thread::current().id(), &task.cmd);
         if self.check_task_deadline_exceeded(&task) {
             return;
@@ -721,7 +722,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
             } else {
                 self.process_write(snapshot, task, &mut statistics).await;
             };
-            info!("the_name {:?} threadid {:?}, Scheduler::process finished , task {:?}", thread::current().name(), thread::current().id(), &task.cmd);
+            info!("the_name {:?} threadid {:?}, Scheduler::process finished , task_id {:?}", thread::current().name(), thread::current().id(), task_id);
             tls_collect_scan_details(tag.get_str(), &statistics);
             let elapsed = timer.saturating_elapsed();
             slow_log!(
