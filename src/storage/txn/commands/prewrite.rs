@@ -502,7 +502,7 @@ impl<K: PrewriteKind> Prewriter<K> {
             }
 
             let need_min_commit_ts = secondaries.is_some() || self.try_one_pc;
-            info!("perwrite all {:?} {:?} is_pessimistic_lock {:?}", txn, key, is_pessimistic_lock);
+            info!("thd_name {:?} perwrite all {:?} {:?} mutation_type {:?}  is_pessimistic_lock {:?}", thread::current().name(), txn, key, mutation_type,is_pessimistic_lock);
             let prewrite_result =
                 prewrite(txn, reader, &props, m, secondaries, is_pessimistic_lock);
             match prewrite_result {

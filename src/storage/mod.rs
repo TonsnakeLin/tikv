@@ -109,6 +109,7 @@ use tikv_kv::SnapshotExt;
 use tikv_util::quota_limiter::QuotaLimiter;
 use tikv_util::time::{duration_to_ms, Instant, ThreadReadId};
 use txn_types::{Key, KvPair, Lock, OldValues, TimeStamp, TsSet, Value};
+use std::thread;
 
 pub type Result<T> = std::result::Result<T, Error>;
 pub type Callback<T> = Box<dyn FnOnce(Result<T>) + Send>;
@@ -1379,6 +1380,7 @@ impl<E: Engine, L: LockManager, Api: APIVersion> Storage<E, L, Api> {
         };
 
         let cmd: Command = cmd.into();
+        info!("thd_name {:?}, sched_txn_command, command {:?}", thread::current().name(), cmd);
 
         match &cmd {
             Command::Prewrite(Prewrite { mutations, .. }) => {
