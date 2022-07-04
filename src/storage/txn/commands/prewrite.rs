@@ -5,7 +5,7 @@
 //! (although maybe they shouldn't be since there is only one protobuf), but
 //! handling of the commands is similar. We therefore have a single type (Prewriter) to handle both
 //! kinds of prewrite.
-using std::thread;
+use std::thread;
 
 use crate::storage::{
     kv::WriteData,
