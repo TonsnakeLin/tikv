@@ -66,7 +66,6 @@ use crate::storage::{
     get_priority_tag, kv::FlowStatsReporter, types::StorageCallback, Error as StorageError,
     ErrorInner as StorageErrorInner,
 };
-use std::thread;
 
 const TASKS_SLOTS_NUM: usize = 1 << 12; // 4096 slots.
 
@@ -722,7 +721,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
             } else {
                 self.process_write(snapshot, task, &mut statistics).await;
             };
-            info!("the_name {:?} threadid {:?}, Scheduler::process finished , task {:?}", thread::current().name(), thread::current().id(), task.cmd);
+            info!("the_name {:?} threadid {:?}, Scheduler::process finished , task {:?}", thread::current().name(), thread::current().id(), task);
             tls_collect_scan_details(tag.get_str(), &statistics);
             let elapsed = timer.saturating_elapsed();
             slow_log!(
