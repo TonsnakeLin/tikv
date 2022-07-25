@@ -135,7 +135,7 @@ pub fn acquire_pessimistic_lock<S: Snapshot>(
     }
 
     // Following seek_write read the previous write.
-    let key_exists = false;
+    let mut key_exists = false;
     let (prev_write_loaded, mut prev_write) = (true, None);
     if let Some((commit_ts, write)) = reader.seek_write(&key, TimeStamp::max())? {
         key_exists = true;
