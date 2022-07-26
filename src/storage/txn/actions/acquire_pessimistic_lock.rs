@@ -240,7 +240,7 @@ pub fn acquire_pessimistic_lock<S: Snapshot>(
         min_commit_ts,
     };
 
-    if lock_if_exists && key_exists {
+    if !lock_if_exists || key_exists {
         txn.put_pessimistic_lock(key, lock);
     }    
     // TODO don't we need to commit the modifies in txn?
