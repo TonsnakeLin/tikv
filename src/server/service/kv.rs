@@ -1431,7 +1431,7 @@ fn future_get<E: Engine, L: LockManager, F: KvFormat>(
     mut req: GetRequest,
 ) -> impl Future<Output = ServerResult<GetResponse>> {
     if req.get_context().get_request_source().contains("external_") {
-        info!("thd_name {:?} future_get request {:?}",req);
+        info!("thd_name {:?} future_get request {:?}",std::thread::current().name(), req);
     }
     let tracker = GLOBAL_TRACKERS.insert(Tracker::new(RequestInfo::new(
         req.get_context(),
@@ -1446,7 +1446,7 @@ fn future_get<E: Engine, L: LockManager, F: KvFormat>(
         req.get_version().into(),
     );
     if req.get_context().get_request_source().contains("external_") {
-        info!("thd_name {:?} future_get after storage.get {:?}",req);
+        info!("thd_name {:?} future_get after storage.get {:?}",std::thread::current().name(), req);
     }
     async move {
         let v = v.await;
@@ -1477,7 +1477,7 @@ fn future_get<E: Engine, L: LockManager, F: KvFormat>(
         }
         GLOBAL_TRACKERS.remove(tracker);
         if req.get_context().get_request_source().contains("external_") {
-            info!("thd_name {:?} future_get response {:?}",req);
+            info!("thd_name {:?} future_get response {:?}",std::thread::current().name(), req);
         }
         Ok(resp)
     }
