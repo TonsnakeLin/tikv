@@ -591,6 +591,10 @@ impl<E: Engine, L: LockManager, F: KvFormat> Storage<E, L, F> {
 
         let res = self.read_pool.spawn_handle(
             async move {
+                if ctx.get_request_source().contains("external_") {
+                    info!("thd_name {:?}, Storage::get task, before async snapshot, request {:?}", 
+                    std::thread::current().name(), req);
+                }
                 let stage_scheduled_ts = Instant::now();
                 tls_collect_query(
                     ctx.get_region_id(),
@@ -627,6 +631,10 @@ impl<E: Engine, L: LockManager, F: KvFormat> Storage<E, L, F> {
                     Self::with_tls_engine(|engine| Self::snapshot(engine, snap_ctx)).await?;
 
                 {
+                    if ctx.get_request_source().contains("external_") {
+                        info!("thd_name {:?}, Storage::get task, before snap_store get, request {:?}", 
+                        std::thread::current().name(), req);
+                    }                    
                     let begin_instant = Instant::now();
                     let stage_snap_recv_ts = begin_instant;
                     let buckets = snapshot.ext().get_buckets();
@@ -651,6 +659,10 @@ impl<E: Engine, L: LockManager, F: KvFormat> Storage<E, L, F> {
                             r
                         })
                     });
+                    if ctx.get_request_source().contains("external_") {
+                        info!("thd_name {:?}, Storage::get task, after snap_store get, request {:?}", 
+                        std::thread::current().name(), req);
+                    }  
                     metrics::tls_collect_scan_details(CMD, &statistics);
                     metrics::tls_collect_read_flow(
                         ctx.get_region_id(),
