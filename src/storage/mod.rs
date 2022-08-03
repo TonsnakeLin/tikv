@@ -593,7 +593,7 @@ impl<E: Engine, L: LockManager, F: KvFormat> Storage<E, L, F> {
             async move {
                 if ctx.get_request_source().contains("external_") {
                     info!("thd_name {:?}, Storage::get task, before async snapshot, request {:?}", 
-                    std::thread::current().name(), req);
+                    std::thread::current().name(), ctx);
                 }
                 let stage_scheduled_ts = Instant::now();
                 tls_collect_query(
@@ -633,7 +633,7 @@ impl<E: Engine, L: LockManager, F: KvFormat> Storage<E, L, F> {
                 {
                     if ctx.get_request_source().contains("external_") {
                         info!("thd_name {:?}, Storage::get task, before snap_store get, request {:?}", 
-                        std::thread::current().name(), req);
+                        std::thread::current().name(), ctx);
                     }                    
                     let begin_instant = Instant::now();
                     let stage_snap_recv_ts = begin_instant;
@@ -661,7 +661,7 @@ impl<E: Engine, L: LockManager, F: KvFormat> Storage<E, L, F> {
                     });
                     if ctx.get_request_source().contains("external_") {
                         info!("thd_name {:?}, Storage::get task, after snap_store get, request {:?}", 
-                        std::thread::current().name(), req);
+                        std::thread::current().name(), ctx);
                     }  
                     metrics::tls_collect_scan_details(CMD, &statistics);
                     metrics::tls_collect_read_flow(
