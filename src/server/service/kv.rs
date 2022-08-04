@@ -191,7 +191,7 @@ macro_rules! handle_request {
             forward_unary!(self.proxy, $fn_name, ctx, req, sink);
             let begin_instant = Instant::now();
 
-            let source = req.mut_context().get_request_source();
+            let source = req.mut_context().take_request_source();
             if source.contains("external_") {
                 info!("thd_name {:?} handle_request request {:?} source_type {:?}",
                 std::thread::current().name(), req, source);
@@ -209,7 +209,7 @@ macro_rules! handle_request {
                 GRPC_MSG_HISTOGRAM_STATIC
                     .$fn_name
                     .observe(elapsed.as_secs_f64());
-                record_request_source_metrics(source.to_string(), elapsed);
+                record_request_source_metrics(source, elapsed);
                 ServerResult::Ok(())
             }
             .map_err(|e| {
@@ -1287,6 +1287,10 @@ fn handle_batch_commands_request<E: Engine, L: LockManager, F: KvFormat>(
                     } else {
                        let begin_instant = Instant::now();
                        let source = req.mut_context().take_request_source();
+                       if source.contains("external_") {
+                            info!("thd_name {:?} handle_cmd request_source {:?}",std::thread::current().name(), source);
+                       }
+                       storage.request_source = source.clone();
                        let resp = future_get(storage, req)
                             .map_ok(oneof!(batch_commands_response::response::Cmd::Get))
                             .map_err(|_| GRPC_MSG_FAIL_COUNTER.kv_get.inc());
@@ -1438,7 +1442,7 @@ fn future_get<E: Engine, L: LockManager, F: KvFormat>(
     storage: &Storage<E, L, F>,
     mut req: GetRequest,
 ) -> impl Future<Output = ServerResult<GetResponse>> {
-    if req.get_context().get_request_source().contains("external_") {
+    if (*(&storage.request_source)).contains("external_") {
         info!("thd_name {:?} future_get request {:?}",std::thread::current().name(), req);
     }
     let tracker = GLOBAL_TRACKERS.insert(Tracker::new(RequestInfo::new(

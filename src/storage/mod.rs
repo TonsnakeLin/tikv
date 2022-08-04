@@ -180,6 +180,8 @@ pub struct Storage<E: Engine, L: LockManager, F: KvFormat> {
     quota_limiter: Arc<QuotaLimiter>,
 
     _phantom: PhantomData<F>,
+
+    request_source: String
 }
 
 /// Storage for Api V1
@@ -206,6 +208,7 @@ impl<E: Engine, L: LockManager, F: KvFormat> Clone for Storage<E, L, F> {
             resource_tag_factory: self.resource_tag_factory.clone(),
             quota_limiter: Arc::clone(&self.quota_limiter),
             _phantom: PhantomData,
+            request_source: self.request_source,
         }
     }
 }
