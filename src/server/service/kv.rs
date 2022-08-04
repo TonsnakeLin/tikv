@@ -192,8 +192,16 @@ macro_rules! handle_request {
             let begin_instant = Instant::now();
 
             let source = req.mut_context().take_request_source();
+            if source.contains("external_") {
+                info!("thd_name {:?} future_get request {:?} source_type {:?}",
+                std::thread::current().name(), req, source);
+            }	
+            
             let resp = $future_name(&self.storage, req);
             let task = async move {
+                if source.contains("external_") {
+                    info!("thd_name {:?}, response for future_get, request {:?}",std::thread::current().name(), req);
+                }
                 let resp = resp.await?;
                 let elapsed = begin_instant.saturating_elapsed();
                 set_total_time!(resp, elapsed, $time_detail);
@@ -1476,9 +1484,7 @@ fn future_get<E: Engine, L: LockManager, F: KvFormat>(
             }
         }
         GLOBAL_TRACKERS.remove(tracker);
-        if req.get_context().get_request_source().contains("external_") {
-            info!("thd_name {:?} future_get response {:?}",std::thread::current().name(), req);
-        }
+
         Ok(resp)
     }
 }
