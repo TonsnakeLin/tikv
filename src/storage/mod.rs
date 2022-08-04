@@ -67,7 +67,7 @@ use std::{
     sync::{
         atomic::{self, AtomicBool},
         Arc,
-    },
+    }, default::default,
 };
 
 use api_version::{ApiV1, ApiV2, KeyMode, KvFormat, RawValue};
@@ -288,6 +288,7 @@ impl<E: Engine, L: LockManager, F: KvFormat> Storage<E, L, F> {
             resource_tag_factory,
             quota_limiter,
             _phantom: PhantomData,
+            request_source: default()
         })
     }
 
@@ -298,6 +299,10 @@ impl<E: Engine, L: LockManager, F: KvFormat> Storage<E, L, F> {
 
     pub fn get_scheduler(&self) -> TxnScheduler<E, L> {
         self.sched.clone()
+    }
+
+    pub fn get_request_source(&self) -> &str {
+        self.request_source.as_str()
     }
 
     pub fn get_concurrency_manager(&self) -> ConcurrencyManager {

@@ -1287,7 +1287,7 @@ fn handle_batch_commands_request<E: Engine, L: LockManager, F: KvFormat>(
                     } else {
                        let begin_instant = Instant::now();
                        let source = req.mut_context().take_request_source();
-                       if source.contains("external_") {
+                       if source.as_str().contains("external_") {
                             info!("thd_name {:?} handle_cmd request_source {:?}",std::thread::current().name(), source);
                        }
                        storage.request_source = source.clone();
@@ -1442,7 +1442,7 @@ fn future_get<E: Engine, L: LockManager, F: KvFormat>(
     storage: &Storage<E, L, F>,
     mut req: GetRequest,
 ) -> impl Future<Output = ServerResult<GetResponse>> {
-    if (*(&storage.request_source)).contains("external_") {
+    if storage.get_request_source().contains("external_") {
         info!("thd_name {:?} future_get request {:?}",std::thread::current().name(), req);
     }
     let tracker = GLOBAL_TRACKERS.insert(Tracker::new(RequestInfo::new(
@@ -1457,7 +1457,7 @@ fn future_get<E: Engine, L: LockManager, F: KvFormat>(
         Key::from_raw(req.get_key()),
         req.get_version().into(),
     );
-    if req.get_context().get_request_source().contains("external_") {
+    if storage.get_request_source().contains("external_") {
         info!("thd_name {:?} future_get after storage.get {:?}",std::thread::current().name(), req);
     }
     async move {
