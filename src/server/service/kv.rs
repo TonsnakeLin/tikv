@@ -209,7 +209,7 @@ macro_rules! handle_request {
                 GRPC_MSG_HISTOGRAM_STATIC
                     .$fn_name
                     .observe(elapsed.as_secs_f64());
-                record_request_source_metrics(source, elapsed);
+                record_request_source_metrics(source.to_string(), elapsed);
                 ServerResult::Ok(())
             }
             .map_err(|e| {
