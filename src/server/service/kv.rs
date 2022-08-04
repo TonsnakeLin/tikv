@@ -1290,7 +1290,7 @@ fn handle_batch_commands_request<E: Engine, L: LockManager, F: KvFormat>(
                        if source.as_str().contains("external_") {
                             info!("thd_name {:?} handle_cmd request_source {:?}",std::thread::current().name(), source);
                        }
-                       storage.request_source = source.clone();
+                       storage.set_request_source(source);
                        let resp = future_get(storage, req)
                             .map_ok(oneof!(batch_commands_response::response::Cmd::Get))
                             .map_err(|_| GRPC_MSG_FAIL_COUNTER.kv_get.inc());
