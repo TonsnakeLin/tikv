@@ -208,7 +208,7 @@ impl<E: Engine, L: LockManager, F: KvFormat> Clone for Storage<E, L, F> {
             resource_tag_factory: self.resource_tag_factory.clone(),
             quota_limiter: Arc::clone(&self.quota_limiter),
             _phantom: PhantomData,
-            request_source: self.request_source,
+            request_source: self.request_source.clone(),
         }
     }
 }
@@ -305,7 +305,7 @@ impl<E: Engine, L: LockManager, F: KvFormat> Storage<E, L, F> {
         self.request_source.as_str()
     }
 
-    pub fn set_request_source(&self, source: &String) {
+    pub fn set_request_source(&mut self, source: &String) {
         self.request_source = source.clone();
     }
 
