@@ -191,7 +191,7 @@ macro_rules! handle_request {
             forward_unary!(self.proxy, $fn_name, ctx, req, sink);
             let begin_instant = Instant::now();
 
-            let source = req.mut_context().take_request_source();
+            let source = req.mut_context().get_request_source();
             if source.contains("external_") {
                 info!("thd_name {:?} handle_request request {:?} source_type {:?}",
                 std::thread::current().name(), req, source);
