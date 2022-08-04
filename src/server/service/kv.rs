@@ -193,14 +193,14 @@ macro_rules! handle_request {
 
             let source = req.mut_context().take_request_source();
             if source.contains("external_") {
-                info!("thd_name {:?} future_get request {:?} source_type {:?}",
+                info!("thd_name {:?} handle_request request {:?} source_type {:?}",
                 std::thread::current().name(), req, source);
             }	
             
             let resp = $future_name(&self.storage, req);
             let task = async move {
                 if source.contains("external_") {
-                    info!("thd_name {:?}, response for future_get, request {:?}",std::thread::current().name(), req);
+                    info!("thd_name {:?}, response for handle_request, request {:?}",std::thread::current().name(), req);
                 }
                 let resp = resp.await?;
                 let elapsed = begin_instant.saturating_elapsed();
