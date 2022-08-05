@@ -180,8 +180,6 @@ pub struct Storage<E: Engine, L: LockManager, F: KvFormat> {
     quota_limiter: Arc<QuotaLimiter>,
 
     _phantom: PhantomData<F>,
-
-    request_source: String
 }
 
 /// Storage for Api V1
@@ -207,8 +205,7 @@ impl<E: Engine, L: LockManager, F: KvFormat> Clone for Storage<E, L, F> {
             api_version: self.api_version,
             resource_tag_factory: self.resource_tag_factory.clone(),
             quota_limiter: Arc::clone(&self.quota_limiter),
-            _phantom: PhantomData,
-            request_source: self.request_source.clone(),
+            _phantom: PhantomData,            
         }
     }
 }
@@ -287,8 +284,7 @@ impl<E: Engine, L: LockManager, F: KvFormat> Storage<E, L, F> {
             api_version: config.api_version(),
             resource_tag_factory,
             quota_limiter,
-            _phantom: PhantomData,
-            request_source: String::from(""),
+            _phantom: PhantomData,            
         })
     }
 
@@ -299,14 +295,6 @@ impl<E: Engine, L: LockManager, F: KvFormat> Storage<E, L, F> {
 
     pub fn get_scheduler(&self) -> TxnScheduler<E, L> {
         self.sched.clone()
-    }
-
-    pub fn get_request_source(&self) -> &str {
-        self.request_source.as_str()
-    }
-
-    pub fn set_request_source(&mut self, source: &String) {
-        self.request_source = source.clone();
     }
 
     pub fn get_concurrency_manager(&self) -> ConcurrencyManager {
