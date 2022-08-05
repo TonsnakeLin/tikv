@@ -1236,6 +1236,9 @@ fn response_batch_commands_request<F, T>(
     F: Future<Output = Result<T, ()>> + Send + 'static,
 {
     let task = async move {
+        if source.contains("external_") {
+            info!("thd_name {:?} response_batch_commands_request request_source {:?}",std::thread::current().name(), source);
+        }
         if let Ok(resp) = resp.await {
             let measure = GrpcRequestDuration {
                 begin,
@@ -1447,6 +1450,7 @@ fn future_get<E: Engine, L: LockManager, F: KvFormat>(
     if req.mut_context().get_request_source().contains("external_") {
         info!("thd_name {:?} future_get request {:?}",std::thread::current().name(), req);
     }
+    let request_source = String::from(req.mut_context().get_request_source());
     let tracker = GLOBAL_TRACKERS.insert(Tracker::new(RequestInfo::new(
         req.get_context(),
         RequestType::KvGet,
@@ -1459,7 +1463,7 @@ fn future_get<E: Engine, L: LockManager, F: KvFormat>(
         Key::from_raw(req.get_key()),
         req.get_version().into(),
     );
-    if req.mut_context().get_request_source().contains("external_") {
+    if request_source.contains("external_") {
         info!("thd_name {:?} future_get after storage.get {:?}",std::thread::current().name(), req);
     }
     async move {
