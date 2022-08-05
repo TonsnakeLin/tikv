@@ -649,6 +649,7 @@ impl<E: Engine, L: LockManager, F: KvFormat> Storage<E, L, F> {
                             bypass_locks,
                             access_locks,
                             false,
+                            ctx.get_request_source().contains("external_"),
                         );
                         snap_store
                         .get(&key, &mut statistics)
@@ -990,6 +991,7 @@ impl<E: Engine, L: LockManager, F: KvFormat> Storage<E, L, F> {
                             bypass_locks,
                             access_locks,
                             false,
+                            false,
                         );
                         let mut stats = Statistics::default();
                         let result = snap_store
@@ -1209,6 +1211,7 @@ impl<E: Engine, L: LockManager, F: KvFormat> Storage<E, L, F> {
                         !ctx.get_not_fill_cache(),
                         bypass_locks,
                         access_locks,
+                        false,
                         false,
                     );
 
