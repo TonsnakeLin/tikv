@@ -413,7 +413,7 @@ impl<S: Snapshot> SnapshotStore<S> {
         bypass_locks: TsSet,
         access_locks: TsSet,
         check_has_newer_ts_data: bool,
-        is_exeternal: bool,
+        is_external: bool,
     ) -> Self {
         SnapshotStore {
             snapshot,
