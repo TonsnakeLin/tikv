@@ -744,7 +744,7 @@ mod tests {
             met_newer_ts_data: NewerTsCheckState::NotMetYet,
             statistics: Statistics::default(),
             write_cursor,
-            false,
+            is_external: false,
         };
         must_get_value(&mut getter, b"foo", b"bar");
         let s = getter.take_statistics();
