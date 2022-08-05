@@ -278,11 +278,15 @@ impl<S: Snapshot> Store for SnapshotStore<S> {
     type Scanner = MvccScanner<S>;
 
     fn get(&self, key: &Key, statistics: &mut Statistics) -> Result<Option<Value>> {
+        if self.is_external {
+            info!("thd_name {:?} SnapshotStore::get key {:?}",std::thread::current().name(), key);
+        }
         let mut point_getter = PointGetterBuilder::new(self.snapshot.clone(), self.start_ts)
             .fill_cache(self.fill_cache)
             .isolation_level(self.isolation_level)
             .bypass_locks(self.bypass_locks.clone())
             .access_locks(self.access_locks.clone())
+            .set_is_exteranl(self.is_external)
             .build()?;
         let v = point_getter.get(key)?;
         statistics.add(&point_getter.take_statistics());

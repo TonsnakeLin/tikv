@@ -23,6 +23,7 @@ pub struct PointGetterBuilder<S: Snapshot> {
     bypass_locks: TsSet,
     access_locks: TsSet,
     check_has_newer_ts_data: bool,
+    is_external: bool,
 }
 
 impl<S: Snapshot> PointGetterBuilder<S> {
@@ -37,6 +38,7 @@ impl<S: Snapshot> PointGetterBuilder<S> {
             bypass_locks: Default::default(),
             access_locks: Default::default(),
             check_has_newer_ts_data: false,
+            is_external: false,
         }
     }
 
@@ -93,6 +95,11 @@ impl<S: Snapshot> PointGetterBuilder<S> {
         self
     }
 
+    pub fn set_is_exteranl(mut self, is_external: bool) -> Self {
+        self.is_external = is_external;
+        self
+    }
+
     /// Check whether there is data with newer ts. The result of
     /// `met_newer_ts_data` is Unknown if this option is not set.
     ///
@@ -128,6 +135,7 @@ impl<S: Snapshot> PointGetterBuilder<S> {
             statistics: Statistics::default(),
 
             write_cursor,
+            is_external: self.is_external,
         })
     }
 }
@@ -149,6 +157,7 @@ pub struct PointGetter<S: Snapshot> {
     statistics: Statistics,
 
     write_cursor: Cursor<S::Iter>,
+    is_external: bool,
 }
 
 impl<S: Snapshot> PointGetter<S> {
@@ -168,7 +177,6 @@ impl<S: Snapshot> PointGetter<S> {
     /// Get the value of a user key.
     pub fn get(&mut self, user_key: &Key) -> Result<Option<Value>> {
         fail_point!("point_getter_get");
-
         if need_check_locks(self.isolation_level) {
             // Check locks that signal concurrent writes for `Si` or more recent writes for
             // `RcCheckTs`.
@@ -736,6 +744,7 @@ mod tests {
             met_newer_ts_data: NewerTsCheckState::NotMetYet,
             statistics: Statistics::default(),
             write_cursor,
+            false,
         };
         must_get_value(&mut getter, b"foo", b"bar");
         let s = getter.take_statistics();
