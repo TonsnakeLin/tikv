@@ -191,7 +191,8 @@ macro_rules! handle_request {
             forward_unary!(self.proxy, $fn_name, ctx, req, sink);
             let begin_instant = Instant::now();
 
-            let source = req.mut_context().take_request_source();
+            // let source = req.mut_context().take_request_source();
+            let source = String::from(req.mut_context().get_request_source());
             if source.contains("external_") {
                 info!("thd_name {:?} handle_request request {:?} source_type {:?}",
                 std::thread::current().name(), req, source);
@@ -209,7 +210,7 @@ macro_rules! handle_request {
                 GRPC_MSG_HISTOGRAM_STATIC
                     .$fn_name
                     .observe(elapsed.as_secs_f64());
-                record_request_source_metrics(source, elapsed);
+                record_request_source_metrics(String::from(source), elapsed);
                 ServerResult::Ok(())
             }
             .map_err(|e| {
@@ -1286,15 +1287,16 @@ fn handle_batch_commands_request<E: Engine, L: LockManager, F: KvFormat>(
                         batcher.as_mut().unwrap().add_get_request(req, id);
                     } else {
                        let begin_instant = Instant::now();
-                       let source = req.mut_context().take_request_source();
-                       if source.as_str().contains("external_") {
+                       // let source = req.mut_context().take_request_source();
+                       let source = String::from(req.mut_context().get_request_source());
+                       if source.contains("external_") {
                             info!("thd_name {:?} handle_cmd request_source {:?}",std::thread::current().name(), source);
                        }
-                       storage.set_request_source(&source);
+                       // storage.set_request_source(&source);
                        let resp = future_get(storage, req)
                             .map_ok(oneof!(batch_commands_response::response::Cmd::Get))
                             .map_err(|_| GRPC_MSG_FAIL_COUNTER.kv_get.inc());
-                        response_batch_commands_request(id, resp, tx.clone(), begin_instant, GrpcTypeKind::kv_get, source);
+                        response_batch_commands_request(id, resp, tx.clone(), begin_instant, GrpcTypeKind::kv_get, String::from(source));
                     }
                 },
                 Some(batch_commands_request::request::Cmd::RawGet(mut req)) => {
