@@ -36,10 +36,17 @@ pub fn acquire_pessimistic_lock<S: Snapshot>(
     need_check_existence: bool,
     min_commit_ts: TimeStamp,
     need_old_value: bool,
+    print_info: bool
 ) -> MvccResult<(Option<Value>, OldValue)> {
     fail_point!("acquire_pessimistic_lock", |err| Err(
         crate::storage::mvcc::txn::make_txn_error(err, &key, reader.start_ts).into()
     ));
+
+    if print_info {
+        info!("thd_name {:?} acquire_pessimistic_lock, key {:?}, primary {:?}, fuTS {:?}, \
+        need_value {:?} need_check_existence {:?} min_commit_ts {:?}, need_old_value {:?}",
+        std::thread::current().name(), key, primary, for_update_ts, need_value, need_check_existence, min_commit_ts, need_old_value);
+    }
 
     // Update max_ts for Insert operation to guarantee linearizability and snapshot
     // isolation
@@ -302,6 +309,7 @@ pub mod tests {
             need_check_existence,
             min_commit_ts,
             false,
+            false,
         )
         .unwrap();
         let modifies = txn.into_modifies();
@@ -461,6 +469,7 @@ pub mod tests {
             need_value,
             need_check_existence,
             min_commit_ts,
+            false,
             false,
         )
         .unwrap_err()
@@ -929,6 +938,7 @@ pub mod tests {
                         *need_check_existence,
                         min_commit_ts,
                         need_old_value,
+                        false,
                     )
                     .unwrap();
                     assert_eq!(old_value, OldValue::None);
@@ -979,6 +989,7 @@ pub mod tests {
             need_check_existence,
             min_commit_ts,
             need_old_value,
+            false,
         )
         .unwrap();
         assert_eq!(
@@ -1012,6 +1023,7 @@ pub mod tests {
             false,
             min_commit_ts,
             true,
+            false,
         )
         .unwrap();
         assert_eq!(
@@ -1054,6 +1066,7 @@ pub mod tests {
                             *need_check_existence,
                             min_commit_ts,
                             need_old_value,
+                            false,
                         )?;
                         Ok(old_value)
                     });
@@ -1106,6 +1119,7 @@ pub mod tests {
             need_check_existence,
             min_commit_ts,
             need_old_value,
+            false,
         )
         .unwrap_err();
 
@@ -1139,6 +1153,7 @@ pub mod tests {
             check_existence,
             min_commit_ts,
             need_old_value,
+            false,
         )
         .unwrap_err();
     }
