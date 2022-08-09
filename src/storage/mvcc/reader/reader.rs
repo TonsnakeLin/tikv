@@ -206,7 +206,8 @@ impl<S: EngineSnapshot> MvccReader<S> {
 
     pub fn load_lock(&mut self, key: &Key) -> Result<Option<Lock>> {
         if self.print_info {
-            info!("thd_name {:?} MvccReader::load_lock key {:?}",std::thread::current().name(), key);
+            info!("thd_name {:?} MvccReader::load_lock key {:?}, scan_mode {:?}",
+            std::thread::current().name(), key, self.scan_mode);
         }
         if let Some(pessimistic_lock) = self.load_in_memory_pessimistic_lock(key)? {
             if self.print_info {
@@ -232,7 +233,10 @@ impl<S: EngineSnapshot> MvccReader<S> {
                 None => None,
             }
         };
-
+        if self.print_info {
+            info!("thd_name {:?} MvccReader::load_lock, load lock from LOCK_CT, lock {:?}",
+            std::thread::current().name(), res);
+        }
         Ok(res)
     }
 
