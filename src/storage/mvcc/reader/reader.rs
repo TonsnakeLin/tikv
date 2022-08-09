@@ -139,7 +139,7 @@ pub struct MvccReader<S: EngineSnapshot> {
     term: u64,
     #[allow(dead_code)]
     version: u64,
-    print_info: bool
+    pub print_info: bool
 }
 
 impl<S: EngineSnapshot> MvccReader<S> {
@@ -205,7 +205,14 @@ impl<S: EngineSnapshot> MvccReader<S> {
     }
 
     pub fn load_lock(&mut self, key: &Key) -> Result<Option<Lock>> {
+        if self.print_info {
+            info!("thd_name {:?} MvccReader::load_lock key {:?}",std::thread::current().name(), key);
+        }
         if let Some(pessimistic_lock) = self.load_in_memory_pessimistic_lock(key)? {
+            if self.print_info {
+                info!("thd_name {:?} MvccReader::load_lock, load lock from in_memory_pessimistic_lock, lock {:?}",
+                std::thread::current().name(), pessimistic_lock);
+            }
             return Ok(Some(pessimistic_lock));
         }
 
