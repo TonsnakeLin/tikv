@@ -139,6 +139,7 @@ pub struct MvccReader<S: EngineSnapshot> {
     term: u64,
     #[allow(dead_code)]
     version: u64,
+    print_info: bool
 }
 
 impl<S: EngineSnapshot> MvccReader<S> {
@@ -154,6 +155,7 @@ impl<S: EngineSnapshot> MvccReader<S> {
             fill_cache,
             term: 0,
             version: 0,
+            print_info: false
         }
     }
 
@@ -169,6 +171,7 @@ impl<S: EngineSnapshot> MvccReader<S> {
             fill_cache: !ctx.get_not_fill_cache(),
             term: ctx.get_term(),
             version: ctx.get_region_epoch().get_version(),
+            print_info: false,
         }
     }
 
