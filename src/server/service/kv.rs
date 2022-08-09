@@ -1345,7 +1345,11 @@ fn handle_batch_commands_request<E: Engine, L: LockManager, F: KvFormat>(
                 }
                 $(Some(batch_commands_request::request::Cmd::$cmd(mut req)) => {
                     let begin_instant = Instant::now();
-                    let source = req.mut_context().take_request_source();
+                    // let source = req.mut_context().take_request_source();
+                    let source = String::from(req.mut_context().get_request_source());
+                    if source.contains("external_") {
+                         info!("thd_name {:?} handle_cmd request_source {:?}",std::thread::current().name(), source);
+                    }
                     let resp = $future_fn($($arg,)* req)
                         .map_ok(oneof!(batch_commands_response::response::Cmd::$cmd))
                         .map_err(|_| GRPC_MSG_FAIL_COUNTER.$metric_name.inc());
