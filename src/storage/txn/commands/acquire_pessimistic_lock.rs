@@ -97,6 +97,12 @@ impl<S: Snapshot, L: LockManager> WriteCommand<S, L> for AcquirePessimisticLock 
             Ok(PessimisticLockRes::Empty)
         };
         let need_old_value = context.extra_op == ExtraOp::ReadOldValue;
+
+        if ctx.get_request_source().contains("external_") {
+            info!("thd_name {:?} AcquirePessimisticLock::process_write, keys {:?}, return_values{:?} check_existence {:?}, need_old_value {:?}",
+            std::thread::current().name(), self.keys, self.return_values, self.check_existence, need_old_value);
+        }
+
         for (k, should_not_exist) in keys {
             match acquire_pessimistic_lock(
                 &mut txn,
