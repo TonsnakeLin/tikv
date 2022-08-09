@@ -214,13 +214,30 @@ impl<S: Snapshot> PointGetter<S> {
             ) {
                 self.statistics.lock.processed_keys += 1;
                 if self.access_locks.contains(lock.ts) {
+                    if self.is_external {
+                        info!("thd_name {:?}, PointerGetter::load_and_check_lock find lock for key {:?},
+                         but has been committed",
+                        std::thread::current().name(), user_key);
+                    }
                     return Ok(Some(lock));
+                }
+                if self.is_external {
+                    info!("thd_name {:?}, PointerGetter::load_and_check_lock find lock for key {:?}, makes a conflict",
+                    std::thread::current().name(), user_key);
                 }
                 Err(e.into())
             } else {
+                if self.is_external {
+                    info!("thd_name {:?}, PointerGetter::load_and_check_lock find lock for key {:?}, but not conflict",
+                    std::thread::current().name(), user_key);
+                }
                 Ok(None)
             }
         } else {
+            if self.is_external {
+                info!("thd_name {:?}, PointerGetter::load_and_check_lock doesn't find lock for key {:?}",
+                std::thread::current().name(), user_key);
+            }
             Ok(None)
         }
     }
@@ -232,7 +249,9 @@ impl<S: Snapshot> PointGetter<S> {
     fn load_data(&mut self, user_key: &Key) -> Result<Option<Value>> {
         let mut use_near_seek = false;
         let mut seek_key = user_key.clone();
-
+        if self.is_external {
+            info!("thd_name {:?} PonitGetter::load_data key {:?}",std::thread::current().name(), user_key);
+        }
         if self.met_newer_ts_data == NewerTsCheckState::NotMetYet
             || self.isolation_level == IsolationLevel::RcCheckTs
         {
@@ -343,6 +362,10 @@ impl<S: Snapshot> PointGetter<S> {
         write_start_ts: TimeStamp,
         user_key: &Key,
     ) -> Result<Value> {
+        if self.is_external {
+            info!("thd_name {:?} PointGetter::load_data_from_default_cf key {:?}",
+            std::thread::current().name(), user_key);
+        }
         self.statistics.data.get += 1;
         // TODO: We can avoid this clone.
         let value = self
@@ -366,6 +389,10 @@ impl<S: Snapshot> PointGetter<S> {
     /// start_ts.
     fn load_data_from_lock(&mut self, user_key: &Key, lock: Lock) -> Result<Option<Value>> {
         debug_assert!(lock.ts < self.ts && lock.min_commit_ts <= self.ts);
+        if self.is_external {
+            info!("thd_name {:?} PointGetter::load_data_from_lock, key {:?}, lock {:?}",
+            std::thread::current().name(), user_key, lock);
+        }
         match lock.lock_type {
             LockType::Put => {
                 if self.omit_value {
