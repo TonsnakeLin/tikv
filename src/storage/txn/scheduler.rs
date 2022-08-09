@@ -432,6 +432,9 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                 .new_task_context(Task::new(cid, tracker, cmd), callback)
         });
         let deadline = tctx.task.as_ref().unwrap().cmd.deadline();
+        if cmd.ctx().get_request_source().contains("external_") {
+            info!("thd_name {:?} schedule_command, command {:?}, cid {:?}",std::thread::current().name(), cmd, cid);
+        }
         if self.inner.latches.acquire(&mut tctx.lock, cid) {
             fail_point!("txn_scheduler_acquire_success");
             tctx.on_schedule();
@@ -439,6 +442,9 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
             drop(task_slot);
             self.execute(task);
             return;
+        }
+        if cmd.ctx().get_request_source().contains("external_") {
+            info!("thd_name {:?} schedule_command waiting latch, command {:?}, cid {:?}",std::thread::current().name(), cmd, cid);
         }
         // Check deadline in background.
         let sched = self.clone();
@@ -508,6 +514,10 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
             .pool
             .spawn(async move {
                 fail_point!("scheduler_start_execute");
+                if task.cmd.ctx().get_request_source().contains("external_") {
+                    info!("thd_name {:?} scheduler::execute before snapshot, command {:?}, cid {:?}",
+                    std::thread::current().name(), task.cmd, task.cid);
+                }
                 if sched.check_task_deadline_exceeded(&task) {
                     return;
                 }
@@ -549,6 +559,10 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                             "trakcer" => ?task.tracker
                         );
                         sched.process(snapshot, task).await;
+                        if task.cmd.ctx().get_request_source().contains("external_") {
+                            info!("thd_name {:?} scheduler::execute after process, command {:?}, cid {:?}",
+                            std::thread::current().name(), task.cmd, task.cid);
+                        }                        
                     }
                     Err(err) => {
                         SCHED_STAGE_COUNTER_VEC.get(tag).snapshot_err.inc();
@@ -701,6 +715,9 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
 
         let resource_tag = self.inner.resource_tag_factory.new_tag(task.cmd.ctx());
         async {
+            if task.cmd.ctx().get_request_source().contains("external_") {
+                info!("thd_name {:?} scheduler::process command {:?}",std::thread::current().name(), task.cmd);
+            }
             let tag = task.cmd.tag();
             fail_point!("scheduler_async_snapshot_finish");
             SCHED_STAGE_COUNTER_VEC.get(tag).process.inc();
@@ -809,7 +826,10 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                 .observe(begin_instant.saturating_elapsed_secs());
             res
         };
-
+        if task.cmd.ctx().get_request_source().contains("external_") {
+            info!("thd_name {:?} scheduler::process_write after cmd.process_write, command {:?}",
+            std::thread::current().name(), cmd);
+        }
         if write_result.is_ok() {
             // TODO: write bytes can be a bit inaccurate due to error requests or in-memory
             // pessimistic locks.
@@ -865,12 +885,20 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                 key,
                 resource_group_tag: ctx.get_resource_group_tag().into(),
             };
+            if task.cmd.ctx().get_request_source().contains("external_") {
+                info!("thd_name {:?} scheduler::process_write enter wait lock, command {:?}",
+                std::thread::current().name(), cmd);
+            }            
             scheduler.on_wait_for_lock(cid, ts, pr, lock, is_first_lock, wait_timeout, diag_ctx);
             return;
         }
 
         let mut pr = Some(pr);
         if to_be_write.modifies.is_empty() {
+            if task.cmd.ctx().get_request_source().contains("external_") {
+                info!("thd_name {:?} scheduler::process_write modifies is empty, command {:?}",
+                std::thread::current().name(), cmd);
+            }
             scheduler.on_write_finished(cid, pr, Ok(()), lock_guards, false, false, tag);
             return;
         }
@@ -884,6 +912,10 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
             )
         {
             // Safety: `self.sched_pool` ensures a TLS engine exists.
+            if task.cmd.ctx().get_request_source().contains("external_") {
+                info!("thd_name {:?} scheduler::process_write in memory pesslock flinished, command {:?}",
+                std::thread::current().name(), cmd);
+            }         
             unsafe {
                 with_tls_engine(|engine: &E| {
                     // We skip writing the raftstore, but to improve CDC old value hit rate,

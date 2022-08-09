@@ -1415,6 +1415,9 @@ impl<E: Engine, L: LockManager, F: KvFormat> Storage<E, L, F> {
         };
 
         let cmd: Command = cmd.into();
+        if cmd.ctx().get_request_source().contains("external_") {
+            info!("thd_name {:?} sched_txn_command command {:?}",std::thread::current().name(), cmd);
+        }
 
         match &cmd {
             Command::Prewrite(Prewrite { mutations, .. }) => {
