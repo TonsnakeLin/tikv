@@ -828,7 +828,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
         };
         if task.cmd.ctx().get_request_source().contains("external_") {
             info!("thd_name {:?} scheduler::process_write after cmd.process_write, command {:?}",
-            std::thread::current().name(), cmd);
+            std::thread::current().name(), task.cmd);
         }
         if write_result.is_ok() {
             // TODO: write bytes can be a bit inaccurate due to error requests or in-memory
@@ -887,7 +887,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
             };
             if task.cmd.ctx().get_request_source().contains("external_") {
                 info!("thd_name {:?} scheduler::process_write enter wait lock, command {:?}",
-                std::thread::current().name(), cmd);
+                std::thread::current().name(), task.cmd);
             }            
             scheduler.on_wait_for_lock(cid, ts, pr, lock, is_first_lock, wait_timeout, diag_ctx);
             return;
@@ -897,7 +897,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
         if to_be_write.modifies.is_empty() {
             if task.cmd.ctx().get_request_source().contains("external_") {
                 info!("thd_name {:?} scheduler::process_write modifies is empty, command {:?}",
-                std::thread::current().name(), cmd);
+                std::thread::current().name(), task.cmd);
             }
             scheduler.on_write_finished(cid, pr, Ok(()), lock_guards, false, false, tag);
             return;
@@ -914,7 +914,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
             // Safety: `self.sched_pool` ensures a TLS engine exists.
             if task.cmd.ctx().get_request_source().contains("external_") {
                 info!("thd_name {:?} scheduler::process_write in memory pesslock flinished, command {:?}",
-                std::thread::current().name(), cmd);
+                std::thread::current().name(), task.cmd);
             }         
             unsafe {
                 with_tls_engine(|engine: &E| {
