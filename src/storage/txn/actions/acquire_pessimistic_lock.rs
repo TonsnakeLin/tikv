@@ -43,9 +43,9 @@ pub fn acquire_pessimistic_lock<S: Snapshot>(
     ));
 
     if print_info {
-        info!("thd_name {:?} acquire_pessimistic_lock, key {:?}, primary {:?}, fuTS {:?}, \
+        info!("thd_name {:?} acquire_pessimistic_lock, key {:?}, primary {:?}, should_not_exist {:?}, fuTS {:?}, \
         need_value {:?} need_check_existence {:?} min_commit_ts {:?}, need_old_value {:?}",
-        std::thread::current().name(), key, primary, for_update_ts, need_value, need_check_existence, min_commit_ts, need_old_value);
+        std::thread::current().name(), key, primary, should_not_exist, for_update_ts, need_value, need_check_existence, min_commit_ts, need_old_value);
     }
 
     // Update max_ts for Insert operation to guarantee linearizability and snapshot
