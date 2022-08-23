@@ -436,6 +436,13 @@ impl<K: PrewriteKind> Prewriter<K> {
         snapshot: impl Snapshot,
         mut context: WriteContext<'_, impl LockManager>,
     ) -> Result<WriteResult> {
+        let request_source = String::from(self.ctx.get_request_source());
+        if request_source.contains("external_") {
+            info!("thd_name {:?} Prewriter::process_write, primary {:?}, start_ts {:?}, min_commit_ts {:?}, max_commit_ts {:?},
+            secondary_keys {:?}, try_one_pc {:?}, assertion_level {:?}",
+            std::thread::current().name(), self.primary, self.start_ts, self.min_commit_ts, self.max_commit_ts,
+            self.secondary_keys, self.try_one_pc, self.assertion_level);
+        }
         self.kind
             .can_skip_constraint_check(&mut self.mutations, &snapshot, &mut context)?;
         self.check_max_ts_synced(&snapshot)?;
