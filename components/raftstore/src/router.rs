@@ -7,7 +7,7 @@ use crossbeam::channel::TrySendError;
 use engine_traits::{KvEngine, RaftEngine, Snapshot};
 use kvproto::{raft_cmdpb::RaftCmdRequest, raft_serverpb::RaftMessage};
 use raft::SnapshotStatus;
-use tikv_util::time::ThreadReadId;
+use tikv_util::{time::ThreadReadId, info};
 
 use crate::{
     store::{
@@ -54,9 +54,7 @@ where
         extra_opts: RaftCmdExtraOpts,
     ) -> RaftStoreResult<()> {
         if extra_opts.print_info {
-            if ctx.get_request_source().contains("external_") {
-                info!("thd_name {:?}, RaftStoreRouter::send_command",std::thread::current().name());
-            }
+            info!("thd_name {:?}, RaftStoreRouter::send_command",std::thread::current().name());
         }
         send_command_impl::<EK, _>(self, req, cb, extra_opts)
     }

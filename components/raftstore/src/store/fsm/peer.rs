@@ -4033,6 +4033,7 @@ where
                     RaftCmdExtraOpts {
                         deadline: None,
                         disk_full_opt: DiskFullOpt::AllowedOnAlmostFull,
+                        print_info: false,
                     },
                 )),
             )

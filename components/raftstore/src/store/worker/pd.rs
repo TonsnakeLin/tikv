@@ -1523,6 +1523,7 @@ where
                     send_admin_request(&router, region_id, epoch, peer, req, Callback::None, RaftCmdExtraOpts{
                         deadline:None,
                         disk_full_opt:DiskFullOpt::AllowedOnAlmostFull,
+                        print_info: false
                     });
                 } else {
                     PD_HEARTBEAT_COUNTER_VEC.with_label_values(&["noop"]).inc();
