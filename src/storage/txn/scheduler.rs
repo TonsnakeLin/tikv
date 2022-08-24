@@ -714,13 +714,13 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
         debug!("early return response"; "cid" => cid);
         SCHED_STAGE_COUNTER_VEC.get(tag).get(stage).inc();
         if print_info {
-            if request_source.contains("external_") {
+            if print_info {
                 let callback_type = match stage {
                     CommandStageKind::pipelined_write => "proposed_cb",
                     CommandStageKind::async_apply_prewrite => "committed_cb",
                     _ => "",
                 };
-                info!("thd_name {:?}, in early_response,calling callback function, command {:?}, callback_type",
+                info!("thd_name {:?}, in early_response,calling callback function, command {:?}, callback_type {:?}",
                 std::thread::current().name(), cid, callback_type);
             }
         }
@@ -848,7 +848,9 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                 .observe(begin_instant.saturating_elapsed_secs());
             res
         };
+        let mut print_info = false;
         if request_source.contains("external_") {
+            print_info = true;
             info!("thd_name {:?} scheduler::process_write after cmd.process_write, command {:?}",
             std::thread::current().name(), cid);
         }
@@ -978,7 +980,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                             pr.unwrap(),
                             tag,
                             CommandStageKind::async_apply_prewrite,
-                            request_source.contains("external_"),
+                            print_info,
                         );
                     });
                     is_async_apply_prewrite = true;
@@ -1009,7 +1011,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                                 pr.unwrap(),
                                 tag,
                                 CommandStageKind::pipelined_write,
-                                request_source.contains("external_"),
+                                print_info,
                             );
                         });
                         (Some(proposed_cb), None)
@@ -1018,7 +1020,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                     }
                 }
             };
-        if request_source.contains("external_") {
+        if print_info {
             info!("thd_name {:?} scheduler::process_write, command {:?}, response_policy {:?}, is_async_apply_prewrite {:?}",
             std::thread::current().name(), cid, response_policy, is_async_apply_prewrite);
         }  
@@ -1077,7 +1079,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                     .filter_map(|write| match write {
                         Modify::Put(cf, key, ..) | Modify::Delete(cf, key) if *cf == CF_LOCK => {
                             locks.get_mut(key).map(|(_, deleted)| {
-                                if request_source.contains("external_") {
+                                if print_info {
                                     info!("thd_name {:?}, in-memory pessimistic lock needs delete, command {:?}, key{:?}",
                                     std::thread::current().name(), cid, key);
                                 }
@@ -1107,7 +1109,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
         // The callback to receive async results of write prepare from the storage
         // engine.
         let engine_cb = Box::new(move |result: EngineResult<()>| {
-            if request_source.contains("external_") {
+            if print_info {
                 info!("thd_name {:?}, calling engine_cb, command {:?}",
                 std::thread::current().name(), cid);
             }
@@ -1142,7 +1144,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                         pipelined,
                         is_async_apply_prewrite,
                         tag,
-                        request_source.contains("external_"),
+                        print_info,
                     );
                     KV_COMMAND_KEYWRITE_HISTOGRAM_VEC
                         .get(tag)

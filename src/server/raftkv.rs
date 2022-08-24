@@ -374,7 +374,10 @@ where
         if batch.modifies.is_empty() {
             return Err(KvError::from(KvErrorInner::EmptyRequest));
         }
-
+        if ctx.get_request_source.contains("external_") {
+            info!("thd_name {:?} scheduler::process_write after cmd.process_write, modifies {:?}",
+            std::thread::current().name(), batch.modifies);
+        }
         ASYNC_REQUESTS_COUNTER_VEC.write.all.inc();
         let begin_instant = Instant::now_coarse();
 
