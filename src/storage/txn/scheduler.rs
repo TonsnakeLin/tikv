@@ -709,9 +709,21 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
         pr: ProcessResult,
         tag: CommandKind,
         stage: CommandStageKind,
+        print_info: bool, 
     ) {
         debug!("early return response"; "cid" => cid);
         SCHED_STAGE_COUNTER_VEC.get(tag).get(stage).inc();
+        if print_info {
+            if request_source.contains("external_") {
+                let callback_type = match stage {
+                    CommandStageKind::pipelined_write => "proposed_cb",
+                    CommandStageKind::async_apply_prewrite => "committed_cb",
+                    _ => "",
+                };
+                info!("thd_name {:?}, in early_response,calling callback function, command {:?}, callback_type",
+                std::thread::current().name(), cid, callback_type);
+            }
+        }
         cb.execute(pr);
         // It won't release locks here until write finished.
     }
@@ -966,6 +978,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                             pr.unwrap(),
                             tag,
                             CommandStageKind::async_apply_prewrite,
+                            request_source.contains("external_"),
                         );
                     });
                     is_async_apply_prewrite = true;
@@ -996,6 +1009,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                                 pr.unwrap(),
                                 tag,
                                 CommandStageKind::pipelined_write,
+                                request_source.contains("external_"),
                             );
                         });
                         (Some(proposed_cb), None)
@@ -1004,7 +1018,10 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                     }
                 }
             };
-
+        if request_source.contains("external_") {
+            info!("thd_name {:?} scheduler::process_write, command {:?}, response_policy {:?}, is_async_apply_prewrite {:?}",
+            std::thread::current().name(), cid, response_policy, is_async_apply_prewrite);
+        }  
         if self.inner.flow_controller.enabled() {
             if self.inner.flow_controller.is_unlimited(region_id) {
                 // no need to delay if unthrottled, just call consume to record write flow
@@ -1060,6 +1077,10 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                     .filter_map(|write| match write {
                         Modify::Put(cf, key, ..) | Modify::Delete(cf, key) if *cf == CF_LOCK => {
                             locks.get_mut(key).map(|(_, deleted)| {
+                                if request_source.contains("external_") {
+                                    info!("thd_name {:?}, in-memory pessimistic lock needs delete, command {:?}, key{:?}",
+                                    std::thread::current().name(), cid, key);
+                                }
                                 *deleted = true;
                                 key.to_owned()
                             })
@@ -1086,6 +1107,10 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
         // The callback to receive async results of write prepare from the storage
         // engine.
         let engine_cb = Box::new(move |result: EngineResult<()>| {
+            if request_source.contains("external_") {
+                info!("thd_name {:?}, calling engine_cb, command {:?}",
+                std::thread::current().name(), cid);
+            }
             let ok = result.is_ok();
             if ok && !removed_pessimistic_locks.is_empty() {
                 // Removing pessimistic locks when it succeeds to apply. This should be done in
