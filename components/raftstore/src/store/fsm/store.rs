@@ -374,6 +374,9 @@ where
         &self,
         cmd: RaftCommand<EK::Snapshot>,
     ) -> std::result::Result<(), TrySendError<RaftCommand<EK::Snapshot>>> {
+        if cmd.extra_opts.print_info {
+            info!("thd_name {:?}, ServerRaftStoreRouter::send",std::thread::current().name());
+        }
         let region_id = cmd.request.get_header().get_region_id();
         match self.send(region_id, PeerMsg::RaftCommand(cmd)) {
             Ok(()) => Ok(()),

@@ -626,6 +626,10 @@ where
                     }
                 }
                 PeerMsg::RaftCommand(cmd) => {
+                    if cmd.extra_opts.print_info {
+                        info!("thd_name {:?}, PeerFsmDelegate::handle_msgs, cmd {:?}",
+                        std::thread::current().name(), cmd);
+                    }
                     self.ctx
                         .raft_metrics
                         .propose

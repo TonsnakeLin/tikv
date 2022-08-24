@@ -433,7 +433,7 @@ where
     snap_cache: Option<Arc<E::Snapshot>>,
     cache_read_id: ThreadReadId,
     // A channel to raftstore.
-    router: C,
+    router: C, // RaftRouter
 }
 
 impl<C, E> ReadExecutor<E> for LocalReader<C, E>

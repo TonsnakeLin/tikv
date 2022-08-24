@@ -53,6 +53,11 @@ where
         cb: Callback<EK::Snapshot>,
         extra_opts: RaftCmdExtraOpts,
     ) -> RaftStoreResult<()> {
+        if extra_opts.print_info {
+            if ctx.get_request_source().contains("external_") {
+                info!("thd_name {:?}, RaftStoreRouter::send_command",std::thread::current().name());
+            }
+        }
         send_command_impl::<EK, _>(self, req, cb, extra_opts)
     }
 
@@ -103,6 +108,9 @@ where
     EK: KvEngine,
     PR: ProposalRouter<EK::Snapshot>,
 {
+    if extra_opts.print_info {
+        info!("thd_name {:?}, send_command_impl", std::thread::current().name());
+    }
     let region_id = req.get_header().get_region_id();
     let mut cmd = RaftCommand::new(req, cb);
     cmd.extra_opts = extra_opts;
@@ -207,6 +215,9 @@ impl<EK: KvEngine, ER: RaftEngine> ProposalRouter<EK::Snapshot> for ServerRaftSt
         &self,
         cmd: RaftCommand<EK::Snapshot>,
     ) -> std::result::Result<(), TrySendError<RaftCommand<EK::Snapshot>>> {
+        if cmd.extra_opts.print_info {
+            info!("thd_name {:?}, ServerRaftStoreRouter::send",std::thread::current().name());
+        }
         ProposalRouter::send(&self.router, cmd)
     }
 }

@@ -531,6 +531,7 @@ impl<EK: KvEngine> fmt::Debug for CasualMessage<EK> {
 pub struct RaftCmdExtraOpts {
     pub deadline: Option<Deadline>,
     pub disk_full_opt: DiskFullOpt,
+    pub print_info: bool,
 }
 
 /// Raft command is the command that is expected to be proposed by the
@@ -566,6 +567,7 @@ impl<S: Snapshot> RaftCommand<S> {
             extra_opts: RaftCmdExtraOpts {
                 deadline: extra_opts.deadline,
                 disk_full_opt: extra_opts.disk_full_opt,
+                print_info: extra_opts.print_info,
             },
         }
     }

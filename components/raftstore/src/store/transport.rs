@@ -114,6 +114,9 @@ where
         &self,
         cmd: RaftCommand<EK::Snapshot>,
     ) -> std::result::Result<(), TrySendError<RaftCommand<EK::Snapshot>>> {
+        if cmd.extra_opts.print_info {
+            info!("thd_name {:?}, ServerRaftStoreRouter::send",std::thread::current().name());
+        }
         self.send_raft_command(cmd)
     }
 }

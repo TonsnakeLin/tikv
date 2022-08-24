@@ -155,7 +155,7 @@ where
     E: KvEngine,
     S: RaftStoreRouter<E> + LocalReadRouter<E> + 'static,
 {
-    router: S,
+    router: S, // ServerRaftStoreRouter
     engine: E,
     txn_extra_scheduler: Option<Arc<dyn TxnExtraScheduler>>,
 }
@@ -259,6 +259,11 @@ where
 
         self.schedule_txn_extra(txn_extra);
 
+        if ctx.get_request_source().contains("external_") {
+            info!("thd_name {:?} RaftKV::exec_write_requests, cmd {:?}",
+            std::thread::current().name(), cmd);
+        }
+
         let cb = StoreCallback::write_ext(
             Box::new(move |resp| {
                 write_cb(on_write_result(resp).map_err(Error::into));
@@ -269,6 +274,7 @@ where
         let extra_opts = RaftCmdExtraOpts {
             deadline: batch.deadline,
             disk_full_opt: batch.disk_full_opt,
+            print_info: ctx.get_request_source().contains("external_"),
         };
         self.router.send_command(cmd, cb, extra_opts)?;
 
@@ -375,7 +381,7 @@ where
             return Err(KvError::from(KvErrorInner::EmptyRequest));
         }
         if ctx.get_request_source().contains("external_") {
-            info!("thd_name {:?} scheduler::process_write after cmd.process_write, modifies {:?}",
+            info!("thd_name {:?}, RaftKv::async_write_ext, modifies {:?}",
             std::thread::current().name(), batch.modifies);
         }
         ASYNC_REQUESTS_COUNTER_VEC.write.all.inc();
