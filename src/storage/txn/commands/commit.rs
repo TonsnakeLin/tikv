@@ -45,7 +45,7 @@ impl CommandExt for Commit {
 
 impl<S: Snapshot, L: LockManager> WriteCommand<S, L> for Commit {
     fn process_write(self, snapshot: S, context: WriteContext<'_, L>) -> Result<WriteResult> {
-        let request_source = String::from(self.ctx().get_request_source());	
+        let request_source = String::from(self.get_ctx().get_request_source());	
         if request_source.contains("external_") {
             info!("thd_name {:?} scheduler::process_write after cmd.process_write, command {:?}",
             std::thread::current().name(), self);

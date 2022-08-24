@@ -628,6 +628,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
         pipelined: bool,
         async_apply_prewrite: bool,
         tag: CommandKind,
+        print_info: bool,
     ) {
         // TODO: Does async apply prewrite worth a special metric here?
         if pipelined {
@@ -670,6 +671,10 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
         }
 
         self.release_lock(&tctx.lock, cid);
+        if print_info {
+            info!("thd_name {:?} scheduler::on_write_finished, cid {:?}, async_apply_prewrite {:?}",
+            std::thread::current().name(), cid, async_apply_prewrite);
+        }
     }
 
     /// Event handler for the request of waiting for lock
@@ -904,7 +909,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                 info!("thd_name {:?} scheduler::process_write modifies is empty, command {:?}",
                 std::thread::current().name(), cid);
             }
-            scheduler.on_write_finished(cid, pr, Ok(()), lock_guards, false, false, tag);
+            scheduler.on_write_finished(cid, pr, Ok(()), lock_guards, false, false, tag, request_source.contains("external_"));
             return;
         }
 
@@ -928,7 +933,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                     engine.schedule_txn_extra(to_be_write.extra);
                 })
             }
-            scheduler.on_write_finished(cid, pr, Ok(()), lock_guards, false, false, tag);
+            scheduler.on_write_finished(cid, pr, Ok(()), lock_guards, false, false, tag, request_source.contains("external_"));
             return;
         }
 
@@ -1112,6 +1117,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                         pipelined,
                         is_async_apply_prewrite,
                         tag,
+                        request_source.contains("external_"),
                     );
                     KV_COMMAND_KEYWRITE_HISTOGRAM_VEC
                         .get(tag)
