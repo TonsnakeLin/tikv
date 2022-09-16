@@ -92,7 +92,7 @@ use crate::{
             RegionTask, SplitCheckTask,
         },
         AbstractPeer, CasualMessage, Config, LocksStatus, MergeResultKind, PdTask, PeerMsg,
-        PeerTick, ProposalContext, RaftCmdExtraOpts, RaftCommand, RaftlogFetchResult,
+        PeerTick, PeerTickExtra, ProposalContext, RaftCmdExtraOpts, RaftCommand, RaftlogFetchResult,
         SignificantMsg, SnapKey, StoreMsg,
     },
     Error, Result,
@@ -167,6 +167,7 @@ where
     /// Before actually destroying a peer, ensure all log gc tasks are finished,
     /// so we can start destroying without seeking.
     logs_gc_flushed: bool,
+    print_info: bool,
 }
 
 pub struct BatchRaftCmdRequestBuilder<E>
@@ -285,6 +286,7 @@ where
                 trace: PeerMemoryTrace::default(),
                 delayed_destroy: None,
                 logs_gc_flushed: false,
+                print_info: false,
             }),
         ))
     }
@@ -339,6 +341,7 @@ where
                 trace: PeerMemoryTrace::default(),
                 delayed_destroy: None,
                 logs_gc_flushed: false,
+                print_info: false,
             }),
         ))
     }
@@ -372,6 +375,9 @@ where
     }
 
     pub fn reset_hibernate_state(&mut self, state: GroupState) {
+        if self.print_info {
+            info!("reset_hibernate_state, hibernate_state {}, new state {}", self.hibernate_state, state);
+        }
         self.hibernate_state.reset(state);
         if state == GroupState::Idle {
             self.peer.raft_group.raft.maybe_free_inflight_buffers();
@@ -460,18 +466,22 @@ where
         self.batch_req_size += req_size as u64;
     }
 
-    fn should_finish(&self, cfg: &Config) -> bool {
+    fn should_finish(&self, cfg: &Config, need_print: bool) -> bool {
+        let mut finished = false;
         if let Some(batch_req) = self.request.as_ref() {
             // Limit the size of batch request so that it will not exceed
             // raft_entry_max_size after adding header.
             if self.batch_req_size > (cfg.raft_entry_max_size.0 as f64 * 0.4) as u64 {
-                return true;
+                finished = true;
             }
             if batch_req.get_requests().len() > <E as WriteBatchExt>::WRITE_BATCH_MAX_KEYS {
-                return true;
+                finished = true;
             }
         }
-        false
+        if need_print && finished {
+            info!("thd_name {:?}, batched raft command should be finished", std::thread::current().name());
+        }
+        finished
     }
 
     fn build(
@@ -599,6 +609,7 @@ where
 {
     fsm: &'a mut PeerFsm<EK, ER>,
     ctx: &'a mut PollContext<EK, ER, T>,
+    print_info: bool,
 }
 
 impl<'a, EK, ER, T: Transport> PeerFsmDelegate<'a, EK, ER, T>
@@ -610,7 +621,7 @@ where
         fsm: &'a mut PeerFsm<EK, ER>,
         ctx: &'a mut PollContext<EK, ER, T>,
     ) -> PeerFsmDelegate<'a, EK, ER, T> {
-        PeerFsmDelegate { fsm, ctx }
+        PeerFsmDelegate { fsm, ctx, print_info: false, }
     }
 
     pub fn handle_msgs(&mut self, msgs: &mut Vec<PeerMsg<EK>>) {
@@ -629,6 +640,9 @@ where
                     if cmd.extra_opts.print_info {
                         info!("thd_name {:?}, PeerFsmDelegate::handle_msgs, cmd {:?}",
                         std::thread::current().name(), cmd);
+                        self.print_info = true;
+                        self.fsm.print_info = true;
+                        self.ctx.print_info = true;
                     }
                     self.ctx
                         .raft_metrics
@@ -650,11 +664,23 @@ where
                             && !self.fsm.peer.disk_full_peers.majority())
                             || cmd.extra_opts.disk_full_opt == DiskFullOpt::NotAllowedOnFull)
                     {
+                        if cmd.extra_opts.print_info {
+                            info!("thd_name {:?}, raftcommand can be batched , cmd {:?}",
+                            std::thread::current().name(), cmd);
+                        }
                         self.fsm.batch_req_builder.add(cmd, req_size);
-                        if self.fsm.batch_req_builder.should_finish(&self.ctx.cfg) {
+                        if self.fsm.batch_req_builder.should_finish(&self.ctx.cfg, cmd.extra_opts.print_info) {
+                            if cmd.extra_opts.print_info {
+                                info!("thd_name {:?}, batch should finish, propose batch, force = true",
+                                std::thread::current().name());
+                            }
                             self.propose_batch_raft_command(true);
                         }
                     } else {
+                        if cmd.extra_opts.print_info {
+                            info!("thd_name {:?}, raftcommand can not be batched and propose directly, cmd {:?}",
+                            std::thread::current().name(), cmd);
+                        }
                         self.propose_raft_command(
                             cmd.request,
                             cmd.callback,
@@ -662,7 +688,16 @@ where
                         )
                     }
                 }
-                PeerMsg::Tick(tick) => self.on_tick(tick),
+                PeerMsg::Tick(tick) => {
+                    if tick.print_info {
+                        info!("thd_name {:?}, process PeerMsg::Tick, tick {:?}",
+                            std::thread::current().name(), tick);
+                            self.print_info = true;
+                            self.fsm.print_info = true;
+                            self.ctx.print_info = true;
+                    }
+                    self.on_tick(tick.peer_tick);
+                }
                 PeerMsg::ApplyRes { res } => {
                     self.on_apply_res(res);
                 }
@@ -694,8 +729,14 @@ where
         }
         // Propose batch request which may be still waiting for more raft-command
         if self.ctx.sync_write_worker.is_some() {
+            if cmd.extra_opts.print_info {
+                info!("thd_name {:?}, has sync_write_worker, call propose_batch_raft_command(force = true)",
+                std::thread::current().name());
+            }
             self.propose_batch_raft_command(true);
         } else {
+            info!("thd_name {:?}, has async_write_worker, call propose_batch_raft_command(force = false)",
+            std::thread::current().name());
             self.propose_batch_raft_command(false);
             self.check_batch_cmd_and_proposed_cb();
         }
@@ -710,6 +751,10 @@ where
             && self.fsm.peer.unpersisted_ready_len()
                 >= self.ctx.cfg.cmd_batch_concurrent_ready_max_count
         {
+            if self.print_info {
+                info!("thd_name {:?}, propose_batch_raft_command force = false, do nothing",
+                std::thread::current().name());               
+            }
             return;
         }
         fail_point!("propose_batch_raft_command", !force, |_| {});
@@ -1867,6 +1912,10 @@ where
 
     #[inline]
     fn schedule_tick(&mut self, tick: PeerTick) {
+        if self.print_info {
+            info!("thd_name {:?}, schedule_tick, tick {:?}",
+            std::thread::current().name(), tick);
+        }
         let idx = tick as usize;
         if self.fsm.tick_registry[idx] {
             return;
@@ -1902,7 +1951,8 @@ where
             // This can happen only when the peer is about to be destroyed
             // or the node is shutting down. So it's OK to not to clean up
             // registry.
-            if let Err(e) = mb.force_send(PeerMsg::Tick(tick)) {
+            if let Err(e) = mb.force_send(PeerMsg::Tick(PeerTickExtra {peer_tick: tick, 
+                print_info: self.print_info,})) {
                 debug!(
                     "failed to schedule peer tick";
                     "region_id" => region_id,
@@ -1927,7 +1977,9 @@ where
             self.fsm.hibernate_state.group_state() == GroupState::Idle,
             |_| {}
         );
-
+        if self.print_info {
+            info!("thd_name {:?}, call on_raft_base_tick", std::thread::current().name());
+        }
         if self.fsm.peer.pending_remove {
             self.fsm.peer.mut_store().flush_entry_cache_metrics();
             return;
@@ -1950,6 +2002,7 @@ where
         let mut res = None;
         if self.ctx.cfg.hibernate_regions {
             if self.fsm.hibernate_state.group_state() == GroupState::Idle {
+                info("current hibernate_state is Idle");
                 // missing_ticks should be less than election timeout ticks otherwise
                 // follower may tick more than an election timeout in chaos state.
                 // Before stopping tick, `missing_tick` should be `raft_election_timeout_ticks`
@@ -4705,12 +4758,19 @@ where
         &mut self,
         msg: &RaftCmdRequest,
     ) -> Result<Option<RaftCmdResponse>> {
+        if self.ctx.print_info {
+            info!("thd_name {:?}, pre_propose_raft_command msg {:?}",
+            std::thread::current().name(), msg);      
+        }
         // Check store_id, make sure that the msg is dispatched to the right place.
         if let Err(e) = util::check_store_id(msg, self.store_id()) {
             self.ctx.raft_metrics.invalid_proposal.mismatch_store_id += 1;
             return Err(e);
         }
         if msg.has_status_request() {
+            if self.print_info {
+                info!("msg has status request");
+            }
             // For status commands, we handle it here directly.
             let resp = self.execute_status_command(msg)?;
             return Ok(Some(resp));
@@ -4840,7 +4900,11 @@ where
                 });
             }
         }
-
+        
+        if self.print_info {
+            info!("thd_name {:?}, propose_raft_command_internal msg {:?}",
+            std::thread::current().name(), msg);               
+        }
         match self.pre_propose_raft_command(&msg) {
             Ok(Some(resp)) => {
                 cb.invoke_with_response(resp);
@@ -4886,6 +4950,7 @@ where
         }
 
         if self.fsm.peer.should_wake_up {
+            info!("fsm.peer.should_wake_up = true, call reset_raft_tick");
             self.reset_raft_tick(GroupState::Ordered);
         }
 

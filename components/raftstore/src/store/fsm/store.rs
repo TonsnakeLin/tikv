@@ -375,7 +375,7 @@ where
         cmd: RaftCommand<EK::Snapshot>,
     ) -> std::result::Result<(), TrySendError<RaftCommand<EK::Snapshot>>> {
         if cmd.extra_opts.print_info {
-            info!("thd_name {:?}, ServerRaftStoreRouter::send",std::thread::current().name());
+            info!("thd_name {:?}, RaftRouter::send",std::thread::current().name());
         }
         let region_id = cmd.request.get_header().get_region_id();
         match self.send(region_id, PeerMsg::RaftCommand(cmd)) {
@@ -526,6 +526,7 @@ where
     pub sync_write_worker: Option<WriteWorker<EK, ER, RaftRouter<EK, ER>, T>>,
     pub io_reschedule_concurrent_count: Arc<AtomicUsize>,
     pub pending_latency_inspect: Vec<util::LatencyInspector>,
+    pub print_info: bool,
 }
 
 impl<EK, ER, T> PollContext<EK, ER, T>
@@ -855,6 +856,7 @@ impl<EK: KvEngine, ER: RaftEngine, T: Transport> PollHandler<PeerFsm<EK, ER>, St
                 }
             }
         }
+        self.poll_ctx.print_info = false;
         let mut delegate = StoreFsmDelegate {
             fsm: store,
             ctx: &mut self.poll_ctx,
@@ -909,7 +911,8 @@ impl<EK: KvEngine, ER: RaftEngine, T: Transport> PollHandler<PeerFsm<EK, ER>, St
                 }
             }
         }
-
+        peer.print_info = false;
+        self.poll_ctx.print_info = false;
         let mut delegate = PeerFsmDelegate::new(peer, &mut self.poll_ctx);
         delegate.handle_msgs(&mut self.peer_msg_buf);
         // No readiness is generated and using sync write, skipping calling ready and
@@ -1319,6 +1322,7 @@ where
             sync_write_worker,
             io_reschedule_concurrent_count: self.io_reschedule_concurrent_count.clone(),
             pending_latency_inspect: vec![],
+            print_info: false,
         };
         ctx.update_ticks_timeout();
         let tag = format!("[store {}]", ctx.store.get_id());

@@ -45,7 +45,7 @@ pub use self::{
     metrics::RAFT_ENTRY_FETCHES_VEC,
     msg::{
         Callback, CasualMessage, ExtCallback, InspectedRaftMessage, MergeResultKind, PeerMsg,
-        PeerTick, RaftCmdExtraOpts, RaftCommand, ReadCallback, ReadResponse, SignificantMsg,
+        PeerTick, PeerTickExtra, RaftCmdExtraOpts, RaftCommand, ReadCallback, ReadResponse, SignificantMsg,
         StoreMsg, StoreTick, WriteCallback, WriteResponse,
     },
     peer::{AbstractPeer, Peer, PeerStat, ProposalContext, RequestInspector, RequestPolicy},

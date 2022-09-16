@@ -3491,6 +3491,9 @@ where
             Ok(Either::Left(idx)) => {
                 let has_applied_to_current_term = self.has_applied_to_current_term();
                 if has_applied_to_current_term {
+                    if ctx.print_info {
+                        info!("Peer::propose has_applied_to_current_term");
+                    }
                     // After this peer has applied to current term and passed above checking
                     // including `cmd_epoch_checker`, we can safely guarantee
                     // that this proposal will be committed if there is no abnormal leader transfer
@@ -4296,7 +4299,9 @@ where
                 self.tag, self.force_leader
             );
         };
-
+        if poll_ctx.print_info {
+            info!("peer::propose_normal begin");
+        }
         if (self.pending_merge_state.is_some()
             && req.get_admin_request().get_cmd_type() != AdminCmdType::RollbackMerge)
             || (self.prepare_merge_fence > 0
@@ -4308,12 +4313,18 @@ where
         poll_ctx.raft_metrics.propose.normal += 1;
 
         if self.has_applied_to_current_term() {
+            if poll_ctx.print_info {
+                info!("peer has_applied_to_current_term");
+            }
             // Only when applied index's term is equal to current leader's term, the
             // information in epoch checker is up to date and can be used to check epoch.
             if let Some(index) = self
                 .cmd_epoch_checker
                 .propose_check_epoch(&req, self.term())
             {
+                if poll_ctx.print_info {
+                    info!("propose_check_epoch failed, return index {}", index);
+                }
                 return Ok(Either::Right(index));
             }
         } else if req.has_admin_request() {
@@ -4364,9 +4375,12 @@ where
                 entry_size: data.len() as u64,
             });
         }
-
         self.maybe_inject_propose_error(&req)?;
         let propose_index = self.next_proposal_index();
+        if poll_ctx.print_info {
+            info!("applied_term {}, raft term {}, propose_index {}",
+            self.get_store().applied_term(),self.term, propose_index);
+        }
         self.raft_group.propose(ctx.to_vec(), data)?;
         if self.next_proposal_index() == propose_index {
             // The message is dropped silently, this usually due to leader absence

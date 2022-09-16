@@ -275,6 +275,12 @@ impl PeerTick {
 }
 
 #[derive(Debug, Clone, Copy)]
+pub struct PeerTickExtra {
+    pub peer_tick: PeerTick,
+    pub print_info: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
 pub enum StoreTick {
     CompactCheck,
     PdStoreHeartbeat,
@@ -590,7 +596,7 @@ pub enum PeerMsg<EK: KvEngine> {
     RaftCommand(RaftCommand<EK::Snapshot>),
     /// Tick is periodical task. If target peer doesn't exist there is a
     /// potential that the raft node will not work anymore.
-    Tick(PeerTick),
+    Tick(PeerTickExtra),
     /// Result of applying committed entries. The message can't be lost.
     ApplyRes {
         res: ApplyTaskRes<EK::Snapshot>,

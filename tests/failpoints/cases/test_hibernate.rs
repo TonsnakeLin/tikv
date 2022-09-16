@@ -8,7 +8,7 @@ use std::{
 
 use kvproto::raft_serverpb::RaftMessage;
 use raft::eraftpb::MessageType;
-use raftstore::store::{PeerMsg, PeerTick};
+use raftstore::store::{PeerMsg, PeerTick, PeerTickExtra};
 use test_raftstore::*;
 use tikv_util::{config::ReadableDuration, HandyRwLock};
 
@@ -59,7 +59,8 @@ fn test_break_leadership_on_restart() {
     rx.recv_timeout(Duration::from_millis(200)).unwrap();
     fail::remove("on_raft_base_tick_idle");
     router
-        .send(1, PeerMsg::Tick(PeerTick::CheckPeerStaleState))
+        .send(1, PeerMsg::Tick(PeerTickExtra{peer_tick: PeerTick::CheckPeerStaleState, 
+            print_info: false,}))
         .unwrap();
 
     // Wait until the peer 3 hibernates again.
