@@ -670,7 +670,7 @@ where
                         }
                         self.fsm.batch_req_builder.add(cmd, req_size);
                         if self.fsm.batch_req_builder.should_finish(&self.ctx.cfg, self.print_info) {
-                            if cmd.extra_opts.print_info {
+                            if self.print_info {
                                 info!("thd_name {:?}, batch should finish, propose batch, force = true",
                                 std::thread::current().name());
                             }
@@ -1914,6 +1914,7 @@ where
 
     #[inline]
     fn schedule_tick(&mut self, tick: PeerTick) {
+        let tmp_print_info = self.print_info;
         if self.print_info {
             info!("thd_name {:?}, schedule_tick, tick {:?}",
             std::thread::current().name(), tick);
@@ -1954,7 +1955,7 @@ where
             // or the node is shutting down. So it's OK to not to clean up
             // registry.
             if let Err(e) = mb.force_send(PeerMsg::Tick(PeerTickExtra {peer_tick: tick, 
-                print_info: self.print_info,})) {
+                print_info: tmp_print_info,})) {
                 debug!(
                     "failed to schedule peer tick";
                     "region_id" => region_id,
