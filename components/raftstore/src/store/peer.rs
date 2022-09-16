@@ -4379,7 +4379,7 @@ where
         let propose_index = self.next_proposal_index();
         if poll_ctx.print_info {
             info!("applied_term {}, raft term {}, propose_index {}",
-            self.get_store().applied_term(),self.term, propose_index);
+            self.get_store().applied_term(),self.term(), propose_index);
         }
         self.raft_group.propose(ctx.to_vec(), data)?;
         if self.next_proposal_index() == propose_index {

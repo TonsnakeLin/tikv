@@ -167,7 +167,7 @@ where
     /// Before actually destroying a peer, ensure all log gc tasks are finished,
     /// so we can start destroying without seeking.
     logs_gc_flushed: bool,
-    print_info: bool,
+    pub print_info: bool,
 }
 
 pub struct BatchRaftCmdRequestBuilder<E>
@@ -376,7 +376,7 @@ where
 
     pub fn reset_hibernate_state(&mut self, state: GroupState) {
         if self.print_info {
-            info!("reset_hibernate_state, hibernate_state {}, new state {}", self.hibernate_state, state);
+            info!("reset_hibernate_state, hibernate_state {:?}, new state {:?}", self.hibernate_state, state);
         }
         self.hibernate_state.reset(state);
         if state == GroupState::Idle {
@@ -729,14 +729,16 @@ where
         }
         // Propose batch request which may be still waiting for more raft-command
         if self.ctx.sync_write_worker.is_some() {
-            if cmd.extra_opts.print_info {
+            if self.print_info {
                 info!("thd_name {:?}, has sync_write_worker, call propose_batch_raft_command(force = true)",
                 std::thread::current().name());
             }
             self.propose_batch_raft_command(true);
         } else {
-            info!("thd_name {:?}, has async_write_worker, call propose_batch_raft_command(force = false)",
-            std::thread::current().name());
+            if self.print_info {
+                info!("thd_name {:?}, has async_write_worker, call propose_batch_raft_command(force = false)",          
+                std::thread::current().name());
+            }
             self.propose_batch_raft_command(false);
             self.check_batch_cmd_and_proposed_cb();
         }
@@ -2002,7 +2004,7 @@ where
         let mut res = None;
         if self.ctx.cfg.hibernate_regions {
             if self.fsm.hibernate_state.group_state() == GroupState::Idle {
-                info("current hibernate_state is Idle");
+                info!("current hibernate_state is Idle");
                 // missing_ticks should be less than election timeout ticks otherwise
                 // follower may tick more than an election timeout in chaos state.
                 // Before stopping tick, `missing_tick` should be `raft_election_timeout_ticks`
