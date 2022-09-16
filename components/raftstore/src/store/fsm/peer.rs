@@ -609,7 +609,7 @@ where
 {
     fsm: &'a mut PeerFsm<EK, ER>,
     ctx: &'a mut PollContext<EK, ER, T>,
-    print_info: bool,
+    print_info: &'a mut bool,
 }
 
 impl<'a, EK, ER, T: Transport> PeerFsmDelegate<'a, EK, ER, T>
@@ -669,7 +669,7 @@ where
                             std::thread::current().name(), cmd);
                         }
                         self.fsm.batch_req_builder.add(cmd, req_size);
-                        if self.fsm.batch_req_builder.should_finish(&self.ctx.cfg, cmd.extra_opts.print_info) {
+                        if self.fsm.batch_req_builder.should_finish(&self.ctx.cfg, self.print_info) {
                             if cmd.extra_opts.print_info {
                                 info!("thd_name {:?}, batch should finish, propose batch, force = true",
                                 std::thread::current().name());
