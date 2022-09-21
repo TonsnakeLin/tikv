@@ -14,6 +14,7 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Arc, Mutex,
     },
+    thread,
     time::{Duration, Instant},
     u64,
 };
@@ -923,8 +924,8 @@ impl<EK: KvEngine, ER: RaftEngine, T: Transport> PollHandler<PeerFsm<EK, ER>, St
                 *skip_end = true;
             }
         }
-        info!("the_name {:?}, function RaftPoller::handle_normal, handle_result {:?}", 
-            thread::current().name(), handle_result as i32);
+        info!("the_name {:?}, function RaftPoller::handle_normal", 
+            thread::current().name());
         handle_result
     }
 
