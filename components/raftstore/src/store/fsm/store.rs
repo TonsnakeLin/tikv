@@ -924,7 +924,7 @@ impl<EK: KvEngine, ER: RaftEngine, T: Transport> PollHandler<PeerFsm<EK, ER>, St
             }
         }
         info!("the_name {:?}, function RaftPoller::handle_normal, handle_result {:?}", 
-            thread::current().name(), handle_result);
+            thread::current().name(), handle_result as i32);
         handle_result
     }
 

@@ -2117,7 +2117,7 @@ where
             if ctx.print_info {
                 info!("thd_name {:?}, func_name [on_role_changed], region_id {:?} \
                 peer_id {:?}, current_lead_id {:?}, ss.leader_id {:?}, current_node_is_leader {:?}", 
-                thread::current().name(), self.region_id, self.get_id(), 
+                thread::current().name(), self.region_id, self.peer.get_id(), 
                 self.leader_id(),ss.leader_id, self.is_leader());
             }
             self.on_leader_changed(ss.leader_id, self.term());
@@ -2483,13 +2483,13 @@ where
         if !self.raft_group.has_ready() {
             fail_point!("before_no_ready_gen_snap_task", |_| None);
             if ctx.print_info {
-                info!("the_name {:?}, func_name [Peer::handle_raft_ready_append], raft_group has no readiness}", 
+                info!("the_name {:?}, func_name [Peer::handle_raft_ready_append], raft_group has no readiness", 
                 thread::current().name());
             }
             // Generating snapshot task won't set ready for raft group.
             if let Some(gen_task) = self.mut_store().take_gen_snap_task() {
                 if ctx.print_info {
-                    info!("the_name {:?}, Generating snapshot task}", 
+                    info!("the_name {:?}, Generating snapshot task", 
                     thread::current().name());
                 }
                 self.pending_request_snapshot_count
@@ -2524,7 +2524,7 @@ where
 
         let mut ready = self.raft_group.ready();
         if ctx.print_info {
-            info!("the_name {:?}, the ready is {:?}}", 
+            info!("the_name {:?}, the ready is {:?}", 
             thread::current().name(), ready); 
         }
 
@@ -2566,7 +2566,7 @@ where
             let raft_msgs = self.build_raft_messages(ctx, ready.take_messages());
             if ctx.print_info {
                 info!("thd_name {:?}, func_name [Peer::handle_raft_read_append], begin to send messages {:?}",
-                raft_msgs);
+                thread::current().name(), raft_msgs);
             }
             self.send_raft_messages(ctx, raft_msgs);
         }
