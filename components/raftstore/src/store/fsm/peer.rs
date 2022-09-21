@@ -1840,6 +1840,10 @@ where
     fn on_role_changed(&mut self, role: Option<StateRole>) {
         // Update leader lease when the Raft state changes.
         if let Some(r) = role {
+            if self.print_info {
+                info!("the_name {:?}, func: PeerFsmDelegate::on_role_changed, role {:?}, force_leader {:?}", 
+                thread::current().name(), r, self.fsm.peer.force_leader);
+            }
             if StateRole::Leader == r {
                 self.fsm.missing_ticks = 0;
                 self.register_split_region_check_tick();
@@ -1871,6 +1875,9 @@ where
     pub fn collect_ready(&mut self) -> bool {
         let has_ready = self.fsm.has_ready;
         self.fsm.has_ready = false;
+        if self.print_info {
+            info!("thd_name {:?}, PeerFsmDelegate::collect_ready, has_read {:?}", thread::current().name(), has_ready);
+        }
         if !has_ready || self.fsm.stopped {
             return false;
         }
@@ -1954,6 +1961,9 @@ where
             // This can happen only when the peer is about to be destroyed
             // or the node is shutting down. So it's OK to not to clean up
             // registry.
+            if tmp_print_info {
+                info!("thd_name {:?}, begin to send peer tick {:?}", thread::current().name(), tick);
+            }
             if let Err(e) = mb.force_send(PeerMsg::Tick(PeerTickExtra {peer_tick: tick, 
                 print_info: tmp_print_info,})) {
                 debug!(
@@ -4953,7 +4963,9 @@ where
         }
 
         if self.fsm.peer.should_wake_up {
-            info!("fsm.peer.should_wake_up = true, call reset_raft_tick");
+            if self.print_info {
+                info!("fsm.peer.should_wake_up = true, call reset_raft_tick");
+            }            
             self.reset_raft_tick(GroupState::Ordered);
         }
 

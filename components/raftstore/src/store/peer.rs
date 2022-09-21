@@ -1623,15 +1623,18 @@ where
             let to_peer_id = msg.get_to_peer().get_id();
             let to_store_id = msg.get_to_peer().get_store_id();
 
-            debug!(
-                "send raft msg";
-                "region_id" => self.region_id,
-                "peer_id" => self.peer.get_id(),
-                "msg_type" => ?msg_type,
-                "msg_size" => msg.get_message().compute_size(),
-                "to" => to_peer_id,
-                "disk_usage" => ?msg.get_disk_usage(),
-            );
+            if ctx.print_info {
+                info!(
+                    "send raft msg";
+                    "region_id" => self.region_id,
+                    "peer_id" => self.peer.get_id(),
+                    "msg_type" => ?msg_type,
+                    "msg_size" => msg.get_message().compute_size(),
+                    "to" => to_peer_id,
+                    "disk_usage" => ?msg.get_disk_usage(),
+                );
+            }
+            
 
             for (term, index) in msg
                 .get_message()
@@ -2111,6 +2114,12 @@ where
                 }
                 _ => {}
             }
+            if ctx.print_info {
+                info!("thd_name {:?}, func_name [on_role_changed], region_id {:?} \
+                peer_id {:?}, current_lead_id {:?}, ss.leader_id {:?}, current_node_is_leader {:?}", 
+                thread::current().name(), self.region_id, self.get_id(), 
+                self.leader_id(),ss.leader_id, self.is_leader());
+            }
             self.on_leader_changed(ss.leader_id, self.term());
             ctx.coprocessor_host.on_role_change(
                 self.region(),
@@ -2123,6 +2132,11 @@ where
             );
             self.cmd_epoch_checker.maybe_update_term(self.term());
         } else if let Some(hs) = ready.hs() {
+            if ctx.print_info {
+                info!("thd_name {:?}, func_name [on_role_changed], region_id {:?}, \
+                peer_id {:?}, current_lead_id {:?}",
+                thread::current().name(), self.region_id, self.peer_id(), self.leader_id())
+            }
             if hs.get_term() != self.get_store().hard_state().get_term() {
                 self.on_leader_changed(self.leader_id(), hs.get_term());
             }
@@ -2402,6 +2416,10 @@ where
         &mut self,
         ctx: &mut PollContext<EK, ER, T>,
     ) -> Option<ReadyResult> {
+        if ctx.print_info {
+            info!("the_name {:?}, func_name [peer::handle_raft_ready_append]", 
+                thread::current().name());
+        }
         if self.pending_remove {
             return None;
         }
@@ -2414,24 +2432,29 @@ where
         if self.has_pending_snapshot() {
             if !self.ready_to_handle_pending_snap() {
                 let count = self.pending_request_snapshot_count.load(Ordering::SeqCst);
-                debug!(
-                    "not ready to apply snapshot";
-                    "region_id" => self.region_id,
-                    "peer_id" => self.peer.get_id(),
-                    "applied_index" => self.get_store().applied_index(),
-                    "last_applying_index" => self.last_applying_idx,
-                    "pending_request_snapshot_count" => count,
-                );
+                if ctx.print_info {
+                    info!(
+                        "not ready to apply snapshot";
+                        "region_id" => self.region_id,
+                        "peer_id" => self.peer.get_id(),
+                        "applied_index" => self.get_store().applied_index(),
+                        "last_applying_index" => self.last_applying_idx,
+                        "pending_request_snapshot_count" => count,
+                    );
+                }
+                
                 return None;
             }
 
             if !self.unpersisted_readies.is_empty() {
-                debug!(
-                    "not ready to apply snapshot because there are some unpersisted readies";
-                    "region_id" => self.region_id,
-                    "peer_id" => self.peer.get_id(),
-                    "unpersisted_readies" => ?self.unpersisted_readies,
-                );
+                if !ctx.print_info {
+                    debug!(
+                        "not ready to apply snapshot because there are some unpersisted readies";
+                        "region_id" => self.region_id,
+                        "peer_id" => self.peer.get_id(),
+                        "unpersisted_readies" => ?self.unpersisted_readies,
+                    );
+                }                
                 return None;
             }
 
@@ -2459,8 +2482,16 @@ where
 
         if !self.raft_group.has_ready() {
             fail_point!("before_no_ready_gen_snap_task", |_| None);
+            if ctx.print_info {
+                info!("the_name {:?}, func_name [Peer::handle_raft_ready_append], raft_group has no readiness}", 
+                thread::current().name());
+            }
             // Generating snapshot task won't set ready for raft group.
             if let Some(gen_task) = self.mut_store().take_gen_snap_task() {
+                if ctx.print_info {
+                    info!("the_name {:?}, Generating snapshot task}", 
+                    thread::current().name());
+                }
                 self.pending_request_snapshot_count
                     .fetch_add(1, Ordering::SeqCst);
                 ctx.apply_router
@@ -2492,6 +2523,10 @@ where
         );
 
         let mut ready = self.raft_group.ready();
+        if ctx.print_info {
+            info!("the_name {:?}, the ready is {:?}}", 
+            thread::current().name(), ready); 
+        }
 
         self.add_ready_metric(&ready, &mut ctx.raft_metrics.ready);
 
@@ -2529,6 +2564,10 @@ where
         if !ready.messages().is_empty() {
             assert!(self.is_leader());
             let raft_msgs = self.build_raft_messages(ctx, ready.take_messages());
+            if ctx.print_info {
+                info!("thd_name {:?}, func_name [Peer::handle_raft_read_append], begin to send messages {:?}",
+                raft_msgs);
+            }
             self.send_raft_messages(ctx, raft_msgs);
         }
 
