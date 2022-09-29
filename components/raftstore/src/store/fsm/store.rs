@@ -962,6 +962,7 @@ impl<EK: KvEngine, ER: RaftEngine, T: Transport> PollHandler<PeerFsm<EK, ER>, St
     }
 
     fn end(&mut self, peers: &mut [Option<impl DerefMut<Target = PeerFsm<EK, ER>>>]) {
+        print_info = self.poll_ctx.print_info;
         if self.poll_ctx.has_ready {
             // Only enable the fail point when the store id is equal to 3, which is
             // the id of slow store in tests.
@@ -983,13 +984,13 @@ impl<EK: KvEngine, ER: RaftEngine, T: Transport> PollHandler<PeerFsm<EK, ER>, St
                     inspector.finish();
                 }
 
-                if self.poll_ctx.print_info {
+                if print_info {
                     info!("thd_name {:?}, RaftPoller::end after write_to_db", thread::current().name());
                 }
 
                 for peer in peers.iter_mut().flatten() {
                     let mut pfd = PeerFsmDelegate::new(peer, &mut self.poll_ctx);
-                    if self.poll_ctx.print_info {
+                    if print_info {
                         pfd.print_info = true;
                     }                    
                     pfd.post_raft_ready_append();
