@@ -1800,6 +1800,9 @@ where
                 // After applying a snapshot, merge is rollbacked implicitly.
                 self.on_ready_rollback_merge(0, None);
             }
+            if self.print_info {
+                info!("thd_name {:?}, PFD::post_raft_read_append and then register_raft_base_tick", thread::current().name());
+            }
             self.register_raft_base_tick();
         }
     }
@@ -2330,8 +2333,12 @@ where
         }
     }
 
-    fn on_raft_message(&mut self, msg: InspectedRaftMessage) -> Result<()> {
+    fn on_raft_message(&mut self, msg: InspectedRaftMessage) -> Result<()> {        
         let InspectedRaftMessage { heap_size, mut msg } = msg;
+        if msg.print_info {
+            info!("thd_name {:?}, func_name [PFD::on_raft_message], msg {:?}", 
+            thread::current().name(), thread::current().id(), msg);
+        }
         let peer_disk_usage = msg.disk_usage;
         let stepped = Cell::new(false);
         let memtrace_raft_entries = &mut self.fsm.peer.memtrace_raft_entries as *mut usize;

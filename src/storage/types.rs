@@ -220,3 +220,161 @@ storage_callback! {
 pub trait StorageCallbackType: Sized {
     fn callback(cb: Callback<Self>) -> StorageCallback;
 }
+
+/*
+pub enum StorageCallback {
+    // $($variant(Callback<$cb_ty>),)*
+    Boolean(Callback<()>),
+    Booleans(Callback<Vec<Result<()>>>),
+    MvccInfoByKey(Callback<MvccInfo>),
+    MvccInfoByStartTs(Callback<Option<(Key, MvccInfo)>>),
+    Locks(Callback<Vec<kvrpcpb::LockInfo>>),
+    TxnStatus(Callback<TxnStatus>),
+    Prewrite(Callback<PrewriteResult>),
+    PessimisticLock(Callback<Result<PessimisticLockRes>>),
+    SecondaryLocksStatus(Callback<SecondaryLocksStatus>),
+    RawCompareAndSwap(Callback<(Option<Value>, bool)>), 
+}
+
+
+
+/// ///////////////////////////////////////////////////////////////////////
+$(impl StorageCallbackType for $cb_ty {
+    fn callback(cb: Callback<Self>) -> StorageCallback {
+        StorageCallback::$variant(cb)
+    }
+})*
+
+impl StorageCallback {
+    /// Delivers the process result of a command to the storage callback.
+    pub fn execute(self, pr: ProcessResult) {
+        match self {
+            $(StorageCallback::$variant(cb) => match pr {
+                $result_variant => cb(Ok($result)),
+                ProcessResult::Failed { err } => cb(Err(err)),
+                _ => panic!("process result mismatch"),
+            },)*
+        }
+    }
+}
+/// ///////////////////////////////////////////////////////////////////////
+impl StorageCallback {
+    /// Delivers the process result of a command to the storage callback.
+    pub fn execute(self, pr: ProcessResult) {
+        match self {
+            StorageCallback:Boolean(cb) => match pr {
+                ProcessResult::Res => cb(Ok(())),
+                ProcessResult::Failed { err } => cb(Err(err)),
+                _ => panic!("process result mismatch"),
+            },
+            StorageCallback:Booleans(cb) => match pr {
+                ProcessResult::MultiRes { results } => cb(Ok(results)),
+                ProcessResult::Failed { err } => cb(Err(err)),
+                _ => panic!("process result mismatch"),
+            },
+            StorageCallback:MvccInfoByKey(cb) => match pr {
+                ProcessResult::MvccKey { mvcc } => cb(Ok(mvcc)),
+                ProcessResult::Failed { err } => cb(Err(err)),
+                _ => panic!("process result mismatch"),
+            },
+            StorageCallback:MvccInfoByStartTs(cb) => match pr {
+                ProcessResult::MvccStartTs { mvcc } => cb(Ok(mvcc)),
+                ProcessResult::Failed { err } => cb(Err(err)),
+                _ => panic!("process result mismatch"),
+            },
+            StorageCallback:Locks(cb) => match pr {
+                ProcessResult::Locks { locks } => cb(Ok(locks)),
+                ProcessResult::Failed { err } => cb(Err(err)),
+                _ => panic!("process result mismatch"),
+            },
+            StorageCallback:TxnStatus(cb) => match pr {
+                ProcessResult::TxnStatus { txn_status } => cb(Ok(txn_status)),
+                ProcessResult::Failed { err } => cb(Err(err)),
+                _ => panic!("process result mismatch"),
+            },
+            StorageCallback:Prewrite(cb) => match pr {
+                ProcessResult::PrewriteResult { result } => cb(Ok(result)),
+                ProcessResult::Failed { err } => cb(Err(err)),
+                _ => panic!("process result mismatch"),
+            },
+            StorageCallback:PessimisticLock(cb) => match pr {
+                PessimisticLockRes { res } => cb(Ok(res)),
+                ProcessResult::Failed { err } => cb(Err(err)),
+                _ => panic!("process result mismatch"),
+            },
+            StorageCallback:SecondaryLocksStatus(cb) => match pr {
+                ProcessResult::SecondaryLocksStatus { status } => cb(Ok(status)),
+                ProcessResult::Failed { err } => cb(Err(err)),
+                _ => panic!("process result mismatch"),
+            },
+            StorageCallback:RawCompareAndSwap(cb) => match pr {
+                ProcessResult::RawCompareAndSwapRes => cb(Ok(())),
+                ProcessResult::Failed { err } => cb(Err(err)),
+                _ => panic!("process result mismatch"),
+            },
+        }
+    }
+}
+
+
+impl StorageCallbackType for () {
+    fn callback(cb: Callback<())>) -> StorageCallback {
+        StorageCallback::Boolean(cb)
+    }
+}
+
+impl StorageCallbackType for Vec<Result<()>> {
+    fn callback(cb: Callback<Self>) -> StorageCallback {
+        StorageCallback::Booleans(cb)
+    }
+}
+
+impl StorageCallbackType for MvccInfo {
+    fn callback(cb: Callback<Self>) -> StorageCallback {
+        StorageCallback::MvccInfoByKey(cb)
+    }
+}
+
+impl StorageCallbackType for Option<(Key, MvccInfo)> {
+    fn callback(cb: Callback<Self>) -> StorageCallback {
+        StorageCallback::MvccInfoByStartTs(cb)
+    }
+}
+
+impl StorageCallbackType for Vec<kvrpcpb::LockInfo> {
+    fn callback(cb: Callback<Self>) -> StorageCallback {
+        StorageCallback::Locks(cb)
+    }
+}
+
+impl StorageCallbackType for TxnStatus {
+    fn callback(cb: Callback<Self>) -> StorageCallback {
+        StorageCallback::TxnStatus(cb)
+    }
+}
+
+impl StorageCallbackType for PrewriteResult {
+    fn callback(cb: Callback<Self>) -> StorageCallback {
+        StorageCallback::Prewrite(cb)
+    }
+}
+
+impl StorageCallbackType for Result<PessimisticLockRes> {
+    fn callback(cb: Callback<Self>) -> StorageCallback {
+        StorageCallback::PessimisticLock(cb)
+    }
+}
+
+impl StorageCallbackType for SecondaryLocksStatus {
+    fn callback(cb: Callback<Self>) -> StorageCallback {
+        StorageCallback::SecondaryLocksStatus(cb)
+    }
+}
+
+impl StorageCallbackType for (Option<Value>, bool) {
+    fn callback(cb: Callback<Self>) -> StorageCallback {
+        StorageCallback::RawCompareAndSwap(cb)
+    }
+}
+
+*/

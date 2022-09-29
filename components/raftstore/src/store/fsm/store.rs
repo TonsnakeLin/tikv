@@ -934,6 +934,10 @@ impl<EK: KvEngine, ER: RaftEngine, T: Transport> PollHandler<PeerFsm<EK, ER>, St
             peer.update_memory_trace(&mut self.trace_event);
         }
 
+        if self.poll_ctx.print_info {
+            info!("thd_name {:?},  call light_end to flush messages", thread::current().name());            
+        }
+
         if let Some(write_worker) = &mut self.poll_ctx.sync_write_worker {
             if self.poll_ctx.trans.need_flush() && !write_worker.is_empty() {
                 self.poll_ctx.trans.flush();
@@ -979,8 +983,16 @@ impl<EK: KvEngine, ER: RaftEngine, T: Transport> PollHandler<PeerFsm<EK, ER>, St
                     inspector.finish();
                 }
 
+                if self.poll_ctx.print_info {
+                    info!("thd_name {:?}, RaftPoller::end after write_to_db", thread::current().name());
+                }
+
                 for peer in peers.iter_mut().flatten() {
-                    PeerFsmDelegate::new(peer, &mut self.poll_ctx).post_raft_ready_append();
+                    let mut pfd = PeerFsmDelegate::new(peer, &mut self.poll_ctx);
+                    if self.poll_ctx.print_info {
+                        pfd.print_info = true;
+                    }                    
+                    pfd.post_raft_ready_append();
                 }
             } else {
                 for inspector in latency_inspect {

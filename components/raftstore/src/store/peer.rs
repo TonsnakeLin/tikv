@@ -1694,7 +1694,7 @@ where
     ) -> Vec<RaftMessage> {
         let mut raft_msgs = Vec::with_capacity(msgs.len());
         for msg in msgs {
-            if let Some(m) = self.build_raft_message(msg, ctx.self_disk_usage) {
+            if let Some(m) = self.build_raft_message(msg, ctx.self_disk_usage, ctx.print_info) {
                 raft_msgs.push(m);
             }
         }
@@ -2575,6 +2575,10 @@ where
         self.apply_reads(ctx, &ready);
 
         if !ready.committed_entries().is_empty() {
+            if ctx.print_info { 
+                info!("thd_name {:?} func_name [Peer::handle_raft_ready_append], ready has committed entries", 
+                thread::current().name());
+            }
             self.handle_raft_committed_entries(ctx, ready.take_committed_entries());
         }
         // Check whether there is a pending generate snapshot task, the task
@@ -2582,6 +2586,10 @@ where
         // Always sending snapshot task behind apply task, so it gets latest
         // snapshot.
         if let Some(gen_task) = self.mut_store().take_gen_snap_task() {
+            if ctx.print_info { 
+                info!("thd_name {:?} func_name [Peer::handle_raft_ready_append], there is a pending generate snapshot task", 
+                thread::current().name());
+            }
             self.pending_request_snapshot_count
                 .fetch_add(1, Ordering::SeqCst);
             ctx.apply_router
@@ -2617,6 +2625,12 @@ where
                 panic!("{} failed to handle raft ready: {:?}", self.tag, e)
             }
         };
+
+        if ctx.print_info {
+            info!("func_name [Peer::handle_raft_ready_append], HandleReadyRes {:?}, WriteTask {:?}",
+            res, task 
+            );	
+        }
 
         let ready_number = ready.number();
         let persisted_msgs = ready.take_persisted_messages();
@@ -2740,7 +2754,10 @@ where
             // Pause `read_progress` to prevent serving stale read while applying snapshot
             self.read_progress.pause();
         }
-
+        if ctx.print_info {
+            info!("func_name: [Peer::handle_raft_ready_append], state_role {:?}, has_new_entries {:?}, has_write_ready {:?}", 
+            state_role, has_new_entries, has_write_ready);
+        }
         Some(ReadyResult {
             state_role,
             has_new_entries,
@@ -3028,9 +3045,18 @@ where
         assert!(ctx.sync_write_worker.is_some());
         let ready = self.unpersisted_ready.take()?;
 
+        if ctx.print_info {
+            info!("thd_name {:?} Peer::handle_raft_ready_advance ready {:?}", 
+            thread::current().name(), ready);
+        }
+
         self.persisted_number = ready.number();
 
         if !ready.snapshot().is_empty() {
+            if ctx.print_info {
+                info!("thd_name {:?} Peer::handle_raft_ready_advance, ready has snapshot", 
+                thread::current().name(), ready);
+            }
             self.raft_group.advance_append_async(ready);
             // The ready is persisted, but we don't want to handle following light
             // ready immediately to avoid flow out of control, so use
@@ -5169,8 +5195,13 @@ where
         &mut self,
         msg: eraftpb::Message,
         disk_usage: DiskUsage,
+        print_info: bool,
     ) -> Option<RaftMessage> {
         let mut send_msg = self.prepare_raft_message();
+
+        if print_info {
+            send_msg.set_print_info(true);
+        }
 
         send_msg.set_disk_usage(disk_usage);
 
