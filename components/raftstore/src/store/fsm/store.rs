@@ -919,13 +919,17 @@ impl<EK: KvEngine, ER: RaftEngine, T: Transport> PollHandler<PeerFsm<EK, ER>, St
         // No readiness is generated and using sync write, skipping calling ready and
         // release early.
         if !delegate.collect_ready() && self.poll_ctx.sync_write_worker.is_some() {
-            info!("the_name {:?}, function RaftPoller::handle_normal, no readiness", thread::current().name());
+            if self.poll_ctx.print_info  {
+                info!("the_name {:?}, function RaftPoller::handle_normal, no readiness", thread::current().name());
+            }
             if let HandleResult::StopAt { skip_end, .. } = &mut handle_result {
                 *skip_end = true;
             }
         }
-        info!("the_name {:?}, function RaftPoller::handle_normal", 
+        if self.poll_ctx.print_info  {
+            info!("the_name {:?}, function RaftPoller::handle_normal", 
             thread::current().name());
+        }
         handle_result
     }
 

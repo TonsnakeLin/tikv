@@ -2019,7 +2019,10 @@ where
         let mut res = None;
         if self.ctx.cfg.hibernate_regions {
             if self.fsm.hibernate_state.group_state() == GroupState::Idle {
-                info!("current hibernate_state is Idle");
+                if self.print_info {
+                    info!("current hibernate_state is Idle");
+                }
+                
                 // missing_ticks should be less than election timeout ticks otherwise
                 // follower may tick more than an election timeout in chaos state.
                 // Before stopping tick, `missing_tick` should be `raft_election_timeout_ticks`

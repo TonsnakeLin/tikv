@@ -411,7 +411,12 @@ impl<T: RaftStoreRouter<E::Local> + 'static, E: Engine, L: LockManager, F: KvFor
 
     fn coprocessor(&mut self, ctx: RpcContext<'_>, mut req: Request, sink: UnarySink<Response>) {
         forward_unary!(self.proxy, coprocessor, ctx, req, sink);
-        let source = req.mut_context().take_request_source();
+        // let source = req.mut_context().take_request_source();
+        let source = String::from(req.mut_context().get_request_source());
+        if source.contains("external_") {
+            info!("thd_name {:?} Service::coprocessor request {:?} source_type {:?}",
+            std::thread::current().name(), req, source);
+        }
         let begin_instant = Instant::now();
         let future = future_copr(&self.copr, Some(ctx.peer()), req);
         let task = async move {
@@ -1318,7 +1323,11 @@ fn handle_batch_commands_request<E: Engine, L: LockManager, F: KvFormat>(
                 },
                 Some(batch_commands_request::request::Cmd::Coprocessor(mut req)) => {
                     let begin_instant = Instant::now();
-                    let source = req.mut_context().take_request_source();
+                    // let source = req.mut_context().take_request_source();
+                    let source = String::from(req.mut_context().get_request_source());
+                    if source.contains("external_") {
+                         info!("thd_name {:?} handle_cmd request_source {:?}",std::thread::current().name(), source);
+                    }
                     let resp = future_copr(copr, Some(peer.to_string()), req)
                         .map_ok(|resp| {
                             resp.map(oneof!(batch_commands_response::response::Cmd::Coprocessor))
