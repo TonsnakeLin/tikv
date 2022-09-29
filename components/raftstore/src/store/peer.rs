@@ -2627,9 +2627,7 @@ where
         };
 
         if ctx.print_info {
-            info!("func_name [Peer::handle_raft_ready_append], HandleReadyRes {:?}, WriteTask {:?}",
-            res, task 
-            );	
+            info!("func_name [Peer::handle_raft_ready_append], HandleReadyRes {:?}", res);	
         }
 
         let ready_number = ready.number();
@@ -3054,7 +3052,7 @@ where
 
         if !ready.snapshot().is_empty() {
             if ctx.print_info {
-                info!("thd_name {:?} Peer::handle_raft_ready_advance, ready has snapshot", 
+                info!("thd_name {:?} Peer::handle_raft_ready_advance, ready has snapshot {:?}", 
                 thread::current().name(), ready);
             }
             self.raft_group.advance_append_async(ready);

@@ -610,7 +610,7 @@ where
 {
     fsm: &'a mut PeerFsm<EK, ER>,
     ctx: &'a mut PollContext<EK, ER, T>,
-    print_info: bool,
+    pub print_info: bool,
 }
 
 impl<'a, EK, ER, T: Transport> PeerFsmDelegate<'a, EK, ER, T>
@@ -2337,7 +2337,7 @@ where
         let InspectedRaftMessage { heap_size, mut msg } = msg;
         if msg.print_info {
             info!("thd_name {:?}, func_name [PFD::on_raft_message], msg {:?}", 
-            thread::current().name(), thread::current().id(), msg);
+            thread::current().name(), msg);
         }
         let peer_disk_usage = msg.disk_usage;
         let stepped = Cell::new(false);
