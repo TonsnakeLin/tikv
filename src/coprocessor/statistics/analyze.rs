@@ -240,6 +240,7 @@ impl<S: Snapshot> RequestHandler for AnalyzeContext<S> {
                     scan_backward_in_range: false,
                     is_key_only: true,
                     is_scanned_range_aware: false,
+                    print_info: false,
                 });
                 let res = AnalyzeContext::handle_index(
                     req,
@@ -351,6 +352,7 @@ impl<S: Snapshot> RowSampleBuilder<S> {
             false,
             false, // Streaming mode is not supported in Analyze request, always false here
             req.take_primary_prefix_column_ids(),
+            false,
         )?;
         Ok(Self {
             data: table_scanner,
@@ -836,6 +838,7 @@ impl<S: Snapshot> SampleBuilder<S> {
             false,
             false, // Streaming mode is not supported in Analyze request, always false here
             req.take_primary_prefix_column_ids(),
+            false,
         )?;
         Ok(Self {
             data: table_scanner,

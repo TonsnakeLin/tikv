@@ -52,6 +52,7 @@ impl<S: Snapshot> ChecksumContext<S> {
             scan_backward_in_range: false,
             is_key_only: false,
             is_scanned_range_aware: false,
+            print_info: false,
         });
         Ok(Self { req, scanner })
     }

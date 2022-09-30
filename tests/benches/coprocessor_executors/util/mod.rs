@@ -51,6 +51,7 @@ pub fn build_dag_handler<TargetTxnStore: TxnStore + 'static>(
         false,
         None,
         Arc::new(QuotaLimiter::default()),
+        false,
     )
     .build()
     .unwrap()

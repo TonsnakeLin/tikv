@@ -176,6 +176,7 @@ pub fn build_executors<S: Storage + 'static>(
     ranges: Vec<KeyRange>,
     config: Arc<EvalConfig>,
     is_scanned_range_aware: bool,
+    print_info: bool,
 ) -> Result<Box<dyn BatchExecutor<StorageStats = S::Statistics>>> {
     let mut executor_descriptors = executor_descriptors.into_iter();
     let mut first_ed = executor_descriptors
@@ -197,6 +198,11 @@ pub fn build_executors<S: Storage + 'static>(
             let primary_column_ids = descriptor.take_primary_column_ids();
             let primary_prefix_column_ids = descriptor.take_primary_prefix_column_ids();
 
+            if print_info {
+                info!("thd_name {:?} build_executors columns_info {:?} primary_column_ids {:?} primary_prefix_column_ids {:?}",
+                std::thread::current().name(), columns_info, primary_column_ids, primary_prefix_column_ids);
+            }
+
             Box::new(
                 BatchTableScanExecutor::new(
                     storage,
@@ -207,6 +213,7 @@ pub fn build_executors<S: Storage + 'static>(
                     descriptor.get_desc(),
                     is_scanned_range_aware,
                     primary_prefix_column_ids,
+                    print_info,
                 )?
                 .collect_summary(summary_slot_index),
             )
@@ -227,6 +234,7 @@ pub fn build_executors<S: Storage + 'static>(
                     descriptor.get_desc(),
                     descriptor.get_unique(),
                     is_scanned_range_aware,
+                    print_info,
                 )?
                 .collect_summary(summary_slot_index),
             )
@@ -379,6 +387,7 @@ impl<SS: 'static> BatchExecutorsRunner<SS> {
         is_streaming: bool,
         paging_size: Option<u64>,
         quota_limiter: Arc<QuotaLimiter>,
+        print_info: bool,
     ) -> Result<Self> {
         let executors_len = req.get_executors().len();
         let collect_exec_summary = req.get_collect_execution_summaries();
@@ -394,6 +403,7 @@ impl<SS: 'static> BatchExecutorsRunner<SS> {
             is_streaming || paging_size.is_some(), /* For streaming and paging request,
                                                     * executors will continue scan from range
                                                     * end where last scan is finished */
+            print_info, 
         )?;
 
         let encode_type = if !is_arrow_encodable(out_most_executor.schema()) {

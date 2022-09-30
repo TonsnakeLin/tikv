@@ -160,6 +160,14 @@ impl<E: Engine> Endpoint<E> {
             req.take_ranges().to_vec(),
             req.get_start_ts(),
         );
+
+        let mut print_info = false;
+        if context.get_request_source().contains("external_") {
+            info!("thd_name {:?} parse_request_and_check_memory_locks",
+            std::thread::current().name());
+            print_info = true
+        }
+
         let cache_match_version = if req.get_is_cache_enabled() {
             Some(req.get_cache_if_match_version())
         } else {
@@ -241,6 +249,7 @@ impl<E: Engine> Endpoint<E> {
                         req.get_is_cache_enabled(),
                         paging_size,
                         quota_limiter,
+                        print_info,
                     )
                     .data_version(data_version)
                     .build()
@@ -388,7 +397,10 @@ impl<E: Engine> Endpoint<E> {
         // that deadline may exceed.
         tracker.on_scheduled();
         tracker.req_ctx.deadline.check()?;
-
+        let print_info = tracker.req_ctx.context.get_request_source().contains("external_");
+        if print_info {
+            info!("thd_name {:?} handle_unary_request_impl begin to async_snapshot",  std::thread::current().name());
+        }
         // Safety: spawning this function using a `FuturePool` ensures that a TLS engine
         // exists.
         let snapshot =
@@ -409,6 +421,10 @@ impl<E: Engine> Endpoint<E> {
             handler_builder(snapshot, &tracker.req_ctx)?
         };
 
+        if print_info {
+            info!("thd_name {:?} handle_unary_request_impl after call handler_builder()",  std::thread::current().name());
+        }
+
         tracker.on_begin_all_items();
 
         let deadline = tracker.req_ctx.deadline;
@@ -418,8 +434,11 @@ impl<E: Engine> Endpoint<E> {
         let deadline_res = if let Some(semaphore) = &semaphore {
             limit_concurrency(handle_request_future, semaphore, LIGHT_TASK_THRESHOLD).await
         } else {
-            handle_request_future.await
+            handle_request_future.await            
         };
+        if print_info {
+            info!("thd_name {:?} handle_unary_request_impl after call handler.handle_request()",  std::thread::current().name());
+        }
         let result = deadline_res.map_err(Error::from).and_then(|res| res);
 
         // There might be errors when handling requests. In this case, we still need its
@@ -455,6 +474,7 @@ impl<E: Engine> Endpoint<E> {
         req_ctx: ReqContext,
         handler_builder: RequestHandlerBuilder<E::Snap>,
     ) -> impl Future<Output = Result<MemoryTraceGuard<coppb::Response>>> {
+        let print_info = req_ctx.context.get_request_source().contains("external_");
         let priority = req_ctx.context.get_priority();
         let task_id = req_ctx.build_task_id();
         let key_ranges = req_ctx
@@ -494,12 +514,22 @@ impl<E: Engine> Endpoint<E> {
             RequestType::Unknown,
             req.start_ts,
         )));
+        let mut print_info = false;
+        if req.get_context().get_request_source().contains("external_") {
+            print_info = true;
+            info!("thd_name {:?} parse_and_handle_unary_request request {:?} source_type {:?}",
+            std::thread::current().name(), req, source);
+        }
         set_tls_tracker_token(tracker);
         let result_of_future = self
             .parse_request_and_check_memory_locks(req, peer, false)
             .map(|(handler_builder, req_ctx)| self.handle_unary_request(req_ctx, handler_builder));
 
         async move {
+            if print_info {
+                info!("thd_name {:?} come to execute result of parse_request_and_check_memory_locks",
+                std::thread::current().name());
+            }
             let res = match result_of_future {
                 Err(e) => make_error_response(e).into(),
                 Ok(handle_fut) => handle_fut

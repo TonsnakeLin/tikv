@@ -47,6 +47,7 @@ impl<S: Storage> BatchTableScanExecutor<S> {
         is_backward: bool,
         is_scanned_range_aware: bool,
         primary_prefix_column_ids: Vec<i64>,
+        print_info: bool,
     ) -> Result<Self> {
         let is_column_filled = vec![false; columns_info.len()];
         let mut is_key_only = true;
@@ -94,6 +95,7 @@ impl<S: Storage> BatchTableScanExecutor<S> {
             handle_indices,
             primary_column_ids,
             is_column_filled,
+            print_info,
         };
         let wrapper = ScanExecutor::new(ScanExecutorOptions {
             imp,
@@ -103,6 +105,7 @@ impl<S: Storage> BatchTableScanExecutor<S> {
             is_key_only,
             accept_point_range: no_common_handle,
             is_scanned_range_aware,
+            print_info,
         })?;
         Ok(Self(wrapper))
     }
@@ -170,6 +173,8 @@ struct TableScanExecutorImpl {
     /// `next_batch`. It is a struct level field in order to prevent repeated
     /// memory allocations since its length is fixed for each `next_batch` call.
     is_column_filled: Vec<bool>,
+
+    pub print_info: bool,
 }
 
 impl TableScanExecutorImpl {
@@ -708,6 +713,7 @@ mod tests {
             false,
             false,
             vec![],
+            false,
         )
         .unwrap();
 
@@ -792,6 +798,7 @@ mod tests {
             false,
             false,
             vec![],
+            false,
         )
         .unwrap()
         .collect_summary(1);
@@ -935,6 +942,7 @@ mod tests {
                 false,
                 false,
                 vec![],
+                false,
             )
             .unwrap();
 
@@ -1042,6 +1050,7 @@ mod tests {
                 false,
                 false,
                 vec![],
+                false,
             )
             .unwrap();
 
@@ -1090,6 +1099,7 @@ mod tests {
                 false,
                 false,
                 vec![],
+                false,
             )
             .unwrap();
 
@@ -1132,6 +1142,7 @@ mod tests {
                 false,
                 false,
                 vec![],
+                false,
             )
             .unwrap();
 
@@ -1171,6 +1182,7 @@ mod tests {
                 false,
                 false,
                 vec![],
+                false,
             )
             .unwrap();
 
@@ -1192,6 +1204,7 @@ mod tests {
                 false,
                 false,
                 vec![],
+                false,
             )
             .unwrap();
 
@@ -1226,6 +1239,7 @@ mod tests {
                 false,
                 false,
                 vec![],
+                false,
             )
             .unwrap();
 
@@ -1276,6 +1290,7 @@ mod tests {
             false,
             false,
             vec![],
+            false,
         )
         .unwrap();
 
@@ -1384,6 +1399,7 @@ mod tests {
             false,
             false,
             primary_prefix_column_ids,
+            false,
         )
         .unwrap();
 
@@ -1565,6 +1581,7 @@ mod tests {
             false,
             false,
             vec![],
+            false,
         )
         .unwrap();
 

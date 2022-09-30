@@ -29,6 +29,7 @@ pub struct DagHandlerBuilder<S: Store + 'static> {
     is_cache_enabled: bool,
     paging_size: Option<u64>,
     quota_limiter: Arc<QuotaLimiter>,
+    pub print_info : bool,
 }
 
 impl<S: Store + 'static> DagHandlerBuilder<S> {
@@ -42,6 +43,7 @@ impl<S: Store + 'static> DagHandlerBuilder<S> {
         is_cache_enabled: bool,
         paging_size: Option<u64>,
         quota_limiter: Arc<QuotaLimiter>,
+        print_info: bool,
     ) -> Self {
         DagHandlerBuilder {
             req,
@@ -54,6 +56,7 @@ impl<S: Store + 'static> DagHandlerBuilder<S> {
             is_cache_enabled,
             paging_size,
             quota_limiter,
+            print_info,
         }
     }
 
@@ -76,6 +79,7 @@ impl<S: Store + 'static> DagHandlerBuilder<S> {
             self.is_streaming,
             self.paging_size,
             self.quota_limiter,
+            self.print_info,
         )?
         .into_boxed())
     }
@@ -98,6 +102,7 @@ impl BatchDagHandler {
         is_streaming: bool,
         paging_size: Option<u64>,
         quota_limiter: Arc<QuotaLimiter>,
+        print_info: bool,
     ) -> Result<Self> {
         Ok(Self {
             runner: tidb_query_executors::runner::BatchExecutorsRunner::from_request(
@@ -109,6 +114,7 @@ impl BatchDagHandler {
                 is_streaming,
                 paging_size,
                 quota_limiter,
+                print_info,
             )?,
             data_version,
         })

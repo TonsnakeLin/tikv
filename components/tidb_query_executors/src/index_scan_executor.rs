@@ -51,6 +51,7 @@ impl<S: Storage> BatchIndexScanExecutor<S> {
         is_backward: bool,
         unique: bool,
         is_scanned_range_aware: bool,
+        print_info: bool,
     ) -> Result<Self> {
         // Note 1: `unique = true` doesn't completely mean that it is a unique index
         // scan. Instead it just means that we can use point-get for this index.
@@ -147,6 +148,7 @@ impl<S: Storage> BatchIndexScanExecutor<S> {
             is_key_only: false,
             accept_point_range: unique,
             is_scanned_range_aware,
+            print_info,
         })?;
         Ok(Self(wrapper))
     }
@@ -981,6 +983,7 @@ mod tests {
                 true,
                 false,
                 false,
+                false,
             )
             .unwrap();
 
@@ -1036,6 +1039,7 @@ mod tests {
                 key_ranges,
                 0,
                 true,
+                false,
                 false,
                 false,
             )
@@ -1098,6 +1102,7 @@ mod tests {
                 true,
                 false,
                 false,
+                false,
             )
             .unwrap();
 
@@ -1141,6 +1146,7 @@ mod tests {
                 key_ranges,
                 0,
                 true,
+                false,
                 false,
                 false,
             )
@@ -1192,6 +1198,7 @@ mod tests {
                 ],
                 key_ranges,
                 0,
+                false,
                 false,
                 false,
                 false,
@@ -1272,6 +1279,7 @@ mod tests {
                 false,
                 false,
                 false,
+                false,
             )
             .unwrap();
 
@@ -1328,6 +1336,7 @@ mod tests {
                 0,
                 false,
                 true,
+                false,
                 false,
             )
             .unwrap();
@@ -1439,6 +1448,7 @@ mod tests {
             false,
             true,
             false,
+            false,
         )
         .unwrap();
 
@@ -1481,6 +1491,7 @@ mod tests {
             1,
             false,
             true,
+            false,
             false,
         )
         .unwrap();
@@ -1575,6 +1586,7 @@ mod tests {
             columns_info,
             key_ranges,
             2,
+            false,
             false,
             false,
             false,
@@ -1678,6 +1690,7 @@ mod tests {
             false,
             true,
             false,
+            false,
         )
         .unwrap();
 
@@ -1772,6 +1785,7 @@ mod tests {
             false,
             true,
             false,
+            false,
         )
         .unwrap();
 
@@ -1864,6 +1878,7 @@ mod tests {
             1,
             false,
             true,
+            false,
             false,
         )
         .unwrap();
@@ -1990,6 +2005,7 @@ mod tests {
             1,
             false,
             true,
+            false,
             false,
         )
         .unwrap();
