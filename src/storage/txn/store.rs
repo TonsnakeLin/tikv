@@ -279,7 +279,7 @@ impl<S: Snapshot> Store for SnapshotStore<S> {
     type Scanner = MvccScanner<S>;
 
     fn get(&self, key: &Key, statistics: &mut Statistics) -> Result<Option<Value>> {
-        if self.is_external {
+        if self.print_info || self.is_external {
             info!("thd_name {:?} SnapshotStore::get key {:?}",std::thread::current().name(), key);
         }
         let mut point_getter = PointGetterBuilder::new(self.snapshot.clone(), self.start_ts)
@@ -360,6 +360,11 @@ impl<S: Snapshot> Store for SnapshotStore<S> {
         lower_bound: Option<Key>,
         upper_bound: Option<Key>,
     ) -> Result<MvccScanner<S>> {
+        if self.print_info {
+            info!("SnapshotStore::scanner"; 
+            "thd_name" => ?std::thread::current().name(),
+            );
+        }
         // Check request bounds with physical bound
         self.verify_range(&lower_bound, &upper_bound)?;
         let scanner = ScannerBuilder::new(self.snapshot.clone(), self.start_ts)
@@ -371,6 +376,7 @@ impl<S: Snapshot> Store for SnapshotStore<S> {
             .bypass_locks(self.bypass_locks.clone())
             .access_locks(self.access_locks.clone())
             .check_has_newer_ts_data(check_has_newer_ts_data)
+            .set_print_info(self.print_info)
             .build()?;
 
         Ok(scanner)

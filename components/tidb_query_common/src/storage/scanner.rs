@@ -80,16 +80,16 @@ impl<T: Storage> RangesScanner<T> {
         &mut self,
         update_scanned_range: bool,
     ) -> Result<Option<OwnedKvPair>, StorageError> {
-        loop {
+        loop {	
             let range = self.ranges_iter.next();
             if self.print_info {
-                info!("RangesScanner::next_opt"; 
+                info!("RangesScanner::next_opt";
                 "thd_name" => ?std::thread::current().name(), 
-                "is_scanned_range_aware", => ?self.is_scanned_range_aware,
+                "is_scanned_range_aware" => ?self.is_scanned_range_aware,
                 "scanned_rows_per_range" => ?self.scanned_rows_per_range,
                 "range status" => ?range,
                 );
-            }
+            }        
             let some_row = match range {
                 IterStatus::NewRange(Range::Point(r)) => {
                     if self.is_scanned_range_aware {
@@ -119,7 +119,7 @@ impl<T: Storage> RangesScanner<T> {
             if self.is_scanned_range_aware && update_scanned_range {
                 self.update_scanned_range_from_scanned_row(&some_row);
             }
-            if some_row.is_some() {
+            if some_row.is_some() {                
                 // Retrieved one row from point range or interval range.
                 if let Some(r) = self.scanned_rows_per_range.last_mut() {
                     *r += 1;

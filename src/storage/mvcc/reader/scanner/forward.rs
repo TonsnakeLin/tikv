@@ -123,6 +123,7 @@ pub struct ForwardScanner<S: Snapshot, P: ScanPolicy<S>> {
     statistics: Statistics,
     scan_policy: P,
     met_newer_ts_data: NewerTsCheckState,
+    print_info: bool,
 }
 
 impl<S: Snapshot, P: ScanPolicy<S>> ForwardScanner<S, P> {
@@ -132,6 +133,7 @@ impl<S: Snapshot, P: ScanPolicy<S>> ForwardScanner<S, P> {
         write_cursor: Cursor<S::Iter>,
         default_cursor: Option<Cursor<S::Iter>>,
         scan_policy: P,
+        print_info: bool,
     ) -> ForwardScanner<S, P> {
         let cursors = Cursors {
             lock: lock_cursor,
@@ -149,6 +151,7 @@ impl<S: Snapshot, P: ScanPolicy<S>> ForwardScanner<S, P> {
             statistics: Statistics::default(),
             is_started: false,
             scan_policy,
+            print_info,
         }
     }
 
@@ -265,6 +268,16 @@ impl<S: Snapshot, P: ScanPolicy<S>> ForwardScanner<S, P> {
                 // to the key or its clones without reallocation.
                 (Key::from_encoded_slice(res.0), res.1, res.2)
             };
+
+            		
+            if self.print_info {
+                info!("FowardScanner::read_next"; 
+                "thd_name" => ?std::thread::current().name(), 
+                "current_user_key" => ?current_user_key,
+                "has_write" => ?has_write,
+                "has_lock" => ?has_lock,
+                );
+            }	
 
             if has_lock {
                 if self.met_newer_ts_data == NewerTsCheckState::NotMetYet {

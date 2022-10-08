@@ -621,8 +621,11 @@ impl<SS: 'static> BatchExecutorsRunner<SS> {
         self.deadline.check()?;
 
         if self.print_info {
-            info!("thd_name {:?} BatchExecuttorsRunner::internal_handle_request begin to execute out_most_executor.next_batch",
-            std::thread::current().name());
+            info!("BatchExecuttorsRunner::internal_handle_request begin to execute out_most_executor.next_batch";
+            "thd_name" => ?std::thread::current().name(),
+            "is_streaming" => ?is_streaming,
+            "encode_type" => ?self.encode_type,
+            );
         }
 
         let mut result = self.out_most_executor.next_batch(batch_size);

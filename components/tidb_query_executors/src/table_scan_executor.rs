@@ -374,6 +374,14 @@ impl ScanExecutorImpl for TableScanExecutorImpl {
     ) -> Result<()> {
         use tidb_query_datatype::codec::datum;
 
+        if self.print_info {
+            info!("TableScanExecutorImpl::process_kv_pair"; 
+            "thd_name" => ?std::thread::current().name(), 
+            "key" => ?key,
+            "value" => ?value,
+            );
+        }
+
         let columns_len = self.schema.len();
         let mut decoded_columns = 0;
 

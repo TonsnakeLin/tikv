@@ -144,8 +144,14 @@ impl<S: Snapshot> ScannerBuilder<S> {
         self
     }
 
+    pub fn set_print_info(mut self, print_info: bool) -> Self {
+        self.0.print_info = print_info;
+        self
+    }
+
     /// Build `Scanner` from the current configuration.
     pub fn build(mut self) -> Result<Scanner<S>> {
+        let print_info = self.0.print_info;
         let lock_cursor = self.build_lock_cursor()?;
         let write_cursor = self.0.create_cf_cursor(CF_WRITE)?;
         if self.0.desc {
@@ -161,6 +167,7 @@ impl<S: Snapshot> ScannerBuilder<S> {
                 write_cursor,
                 None,
                 LatestKvPolicy,
+                print_info,
             )))
         }
     }
@@ -271,6 +278,7 @@ pub struct ScannerConfig<S: Snapshot> {
     access_locks: TsSet,
 
     check_has_newer_ts_data: bool,
+    print_info: bool,
 }
 
 impl<S: Snapshot> ScannerConfig<S> {
@@ -289,6 +297,7 @@ impl<S: Snapshot> ScannerConfig<S> {
             bypass_locks: Default::default(),
             access_locks: Default::default(),
             check_has_newer_ts_data: false,
+            print_info: false,
         }
     }
 
