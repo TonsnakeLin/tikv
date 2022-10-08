@@ -279,6 +279,14 @@ impl ScanExecutorImpl for TableScanExecutorImpl {
         let columns_len = self.schema.len();
         let mut columns = Vec::with_capacity(columns_len);
 
+        if self.print_info {
+            info!("TableScanExecutor::build_column_vec"; 
+            "thd_name" => ?std::thread::current().name(), 
+            "column_id_index" => ?self.column_id_index,
+            "primary_column_ids" => ?self.primary_column_ids,
+            "handle_indices" => ?self.handle_indices);
+        }
+
         // If there are any PK columns, for each of them, fill non-PK columns before it
         // and push the PK column.
         // For example, consider:
@@ -319,6 +327,13 @@ impl ScanExecutorImpl for TableScanExecutorImpl {
             last_index = *handle_index + 1;
         }
 
+        if self.print_info {
+            info!("TableScanExecutor::build_column_vec reslove indices"; 
+            "thd_name" => ?std::thread::current().name(), 
+            "columns_length" => ?columns.len()
+            );
+        }
+
         // Then fill remaining columns after the last handle column. If there are no PK
         // columns, the previous loop will be skipped and this loop will be run
         // on 0..columns_len. For the example above, this loop will push:
@@ -332,6 +347,18 @@ impl ScanExecutorImpl for TableScanExecutorImpl {
             } else {
                 columns.push(LazyBatchColumn::raw_with_capacity(scan_rows));
             }
+        }
+
+        if self.print_info {
+            info!("TableScanExecutor::build_column_vec fill remaining columns"; 
+            "thd_name" => ?std::thread::current().name(), 
+            "columns_length" => ?columns.len()
+            );
+
+            info!("TableScanExecutor::build_column_vec, columns content"; 
+            "thd_name" => ?std::thread::current().name(), 
+            "columns_length" => ?columns
+            );
         }
 
         assert_eq!(columns.len(), columns_len);

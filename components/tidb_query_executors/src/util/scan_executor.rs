@@ -50,6 +50,7 @@ pub struct ScanExecutor<S: Storage, I: ScanExecutorImpl> {
     /// or there was an error scanning the table, this flag will be set to
     /// `true` and `next_batch` should be never called again.
     is_ended: bool,
+    pub print_info: bool,
 }
 
 pub struct ScanExecutorOptions<S, I> {
@@ -94,6 +95,7 @@ impl<S: Storage, I: ScanExecutorImpl> ScanExecutor<S, I> {
                 print_info,
             }),
             is_ended: false,
+            print_info,
         })
     }
 
@@ -175,6 +177,11 @@ impl<S: Storage, I: ScanExecutorImpl> BatchExecutor for ScanExecutor<S, I> {
     fn next_batch(&mut self, scan_rows: usize) -> BatchExecuteResult {
         assert!(!self.is_ended);
         assert!(scan_rows > 0);
+
+        if self.print_info {
+            info!("thd_name {:?} ScanExecutor::next_batch, begin to call imp.build_column_vec and self.fill_column_vec",
+            std::thread::current().name());
+        }
 
         let mut logical_columns = self.imp.build_column_vec(scan_rows);
         let is_drained = self.fill_column_vec(scan_rows, &mut logical_columns);

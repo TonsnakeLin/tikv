@@ -20,6 +20,7 @@ use tikv_util::{
     metrics::{ThrottleType, NON_TXN_COMMAND_THROTTLE_TIME_COUNTER_VEC_STATIC},
     quota_limiter::QuotaLimiter,
     time::Instant,
+    info,
 };
 use tipb::{
     self, Chunk, DagRequest, EncodeType, ExecType, ExecutorExecutionSummary, FieldType,
@@ -83,6 +84,8 @@ pub struct BatchExecutorsRunner<SS> {
     paging_size: Option<u64>,
 
     quota_limiter: Arc<QuotaLimiter>,
+
+    pub print_info: bool,
 }
 
 // We assign a dummy type `()` so that we can omit the type when calling
@@ -199,7 +202,7 @@ pub fn build_executors<S: Storage + 'static>(
             let primary_prefix_column_ids = descriptor.take_primary_prefix_column_ids();
 
             if print_info {
-                info!("thd_name {:?} build_executors columns_info {:?} primary_column_ids {:?} primary_prefix_column_ids {:?}",
+                info!("thd_name {:?} build BatchTableScanExecutor executor columns_info {:?} primary_column_ids {:?} primary_prefix_column_ids {:?}",
                 std::thread::current().name(), columns_info, primary_column_ids, primary_prefix_column_ids);
             }
 
@@ -438,6 +441,7 @@ impl<SS: 'static> BatchExecutorsRunner<SS> {
             encode_type,
             paging_size,
             quota_limiter,
+            print_info,
         })
     }
 
@@ -454,6 +458,7 @@ impl<SS: 'static> BatchExecutorsRunner<SS> {
     /// ranges. e.g.: [(k1 -> k2), (k4 -> k5)] may got response (k1, k2, k4)
     /// with IntervalRange like (k1, k4).
     pub async fn handle_request(&mut self) -> Result<(SelectResponse, Option<IntervalRange>)> {
+        let mut print_count = 0;
         let mut chunks = vec![];
         let mut batch_size = Self::batch_initial_size();
         let mut warnings = self.config.new_eval_warnings();
@@ -461,6 +466,10 @@ impl<SS: 'static> BatchExecutorsRunner<SS> {
         let mut record_all = 0;
 
         let mut time_slice_start = Instant::now();
+        if self.print_info {
+            info!("thd_name {:?} BatchExecutorsRunner::handle_request batch_size{:?}",
+            std::thread::current().name(), batch_size);
+        }
         loop {
             // Check whether we should yield from the execution
             if need_reschedule(time_slice_start) {
@@ -481,6 +490,12 @@ impl<SS: 'static> BatchExecutorsRunner<SS> {
                     &mut ctx,
                 )?
             };
+
+            if print_count/10 == 0 && self.print_info {
+                info!("thd_name {:?} BatchExecutorsRunner::handle_request drained {:?} record_len {:?}",
+                std::thread::current().name(), drained, record_len);
+            }
+            print_count = print_count + 1;
 
             let quota_delay = self.quota_limiter.consume_sample(sample, true).await;
             if !quota_delay.is_zero() {
@@ -604,6 +619,11 @@ impl<SS: 'static> BatchExecutorsRunner<SS> {
         let mut record_len = 0;
 
         self.deadline.check()?;
+
+        if self.print_info {
+            info!("thd_name {:?} BatchExecuttorsRunner::internal_handle_request begin to execute out_most_executor.next_batch",
+            std::thread::current().name());
+        }
 
         let mut result = self.out_most_executor.next_batch(batch_size);
 

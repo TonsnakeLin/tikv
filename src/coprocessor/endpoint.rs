@@ -221,6 +221,11 @@ impl<E: Engine> Endpoint<E> {
 
                 self.check_memory_locks(&req_ctx)?;
 
+                if print_info {
+                    info!("thd_name {:?} parse_request_and_check_memory_locks dag_request {:?}",
+                    std::thread::current().name(), dag);
+                }
+
                 let batch_row_limit = self.get_batch_row_limit(is_streaming);
                 let quota_limiter = self.quota_limiter.clone();
                 builder = Box::new(move |snap, req_ctx| {
@@ -518,7 +523,7 @@ impl<E: Engine> Endpoint<E> {
         if req.get_context().get_request_source().contains("external_") {
             print_info = true;
             info!("thd_name {:?} parse_and_handle_unary_request request {:?} source_type {:?}",
-            std::thread::current().name(), req, source);
+            std::thread::current().name(), req, req.get_context().get_request_source());
         }
         set_tls_tracker_token(tracker);
         let result_of_future = self
