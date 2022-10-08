@@ -188,6 +188,7 @@ impl<S: Snapshot> ScannerBuilder<S> {
             write_cursor,
             Some(default_cursor),
             LatestEntryPolicy::new(after_ts, output_delete),
+            false,
         ))
     }
 
@@ -209,6 +210,7 @@ impl<S: Snapshot> ScannerBuilder<S> {
             write_cursor,
             Some(default_cursor),
             DeltaEntryPolicy::new(from_ts, extra_op),
+            false,
         ))
     }
 
