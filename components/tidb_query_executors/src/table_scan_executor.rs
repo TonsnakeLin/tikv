@@ -21,6 +21,7 @@ use tipb::{ColumnInfo, FieldType, TableScan};
 
 use super::util::scan_executor::*;
 use crate::interface::*;
+use tikv_util::info;
 
 pub struct BatchTableScanExecutor<S: Storage>(ScanExecutor<S, TableScanExecutorImpl>);
 

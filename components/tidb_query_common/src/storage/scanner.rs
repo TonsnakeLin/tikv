@@ -81,6 +81,12 @@ impl<T: Storage> RangesScanner<T> {
     ) -> Result<Option<OwnedKvPair>, StorageError> {
         loop {
             let range = self.ranges_iter.next();
+            if self.print_info {
+                info!("RangesScanner::next_opt"; 
+                "thd_name" => ?std::thread::current().name(), 
+                "scanned_rows_per_range" => ?self.scanned_rows_per_range,
+                "range status" => ?range);
+            }
             let some_row = match range {
                 IterStatus::NewRange(Range::Point(r)) => {
                     if self.is_scanned_range_aware {
