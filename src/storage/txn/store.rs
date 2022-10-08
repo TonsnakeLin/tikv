@@ -272,6 +272,7 @@ pub struct SnapshotStore<S: Snapshot> {
 
     point_getter_cache: Option<PointGetter<S>>,
     is_external: bool,
+    print_info: bool,
 }
 
 impl<S: Snapshot> Store for SnapshotStore<S> {
@@ -418,6 +419,7 @@ impl<S: Snapshot> SnapshotStore<S> {
         access_locks: TsSet,
         check_has_newer_ts_data: bool,
         is_external: bool,
+        print_info: bool,
     ) -> Self {
         SnapshotStore {
             snapshot,
@@ -430,6 +432,7 @@ impl<S: Snapshot> SnapshotStore<S> {
 
             point_getter_cache: None,
             is_external,
+            print_info,
         }
     }
 
@@ -757,6 +760,7 @@ mod tests {
                 Default::default(),
                 false,
                 false,
+                false,
             )
         }
     }
@@ -974,6 +978,7 @@ mod tests {
             Default::default(),
             false,
             false,
+            false,
         );
         let bound_a = Key::from_encoded(b"a".to_vec());
         let bound_b = Key::from_encoded(b"b".to_vec());
@@ -1026,6 +1031,7 @@ mod tests {
             true,
             Default::default(),
             Default::default(),
+            false,
             false,
             false,
         );

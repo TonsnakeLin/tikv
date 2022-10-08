@@ -72,6 +72,7 @@ impl<S: Snapshot> AnalyzeContext<S> {
             req_ctx.access_locks.clone(),
             false,
             false,
+            false,
         );
         let is_auto_analyze = req.get_flags() & REQ_FLAG_TIDB_SYSSESSION > 0;
 

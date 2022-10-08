@@ -78,6 +78,7 @@ fn reversed_checksum_crc64_xor<E: Engine>(store: &Store<E>, range: KeyRange) -> 
         Default::default(),
         false,
         false,
+        false,
     );
     let mut scanner = RangesScanner::new(RangesScannerOptions {
         storage: TiKvStorage::new(store, false),

@@ -2,6 +2,7 @@
 
 use super::{range::*, ranges_iter::*, OwnedKvPair, Storage};
 use crate::error::StorageError;
+use tikv_util::info;
 
 const KEY_BUFFER_CAPACITY: usize = 64;
 
@@ -84,8 +85,10 @@ impl<T: Storage> RangesScanner<T> {
             if self.print_info {
                 info!("RangesScanner::next_opt"; 
                 "thd_name" => ?std::thread::current().name(), 
+                "is_scanned_range_aware", => ?self.is_scanned_range_aware,
                 "scanned_rows_per_range" => ?self.scanned_rows_per_range,
-                "range status" => ?range);
+                "range status" => ?range,
+                );
             }
             let some_row = match range {
                 IterStatus::NewRange(Range::Point(r)) => {

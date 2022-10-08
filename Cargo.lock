@@ -5867,6 +5867,8 @@ dependencies = [
  "prometheus",
  "prometheus-static-metric",
  "serde_json",
+ "slog",
+ "slog-global",
  "thiserror",
  "tikv_util",
  "time",

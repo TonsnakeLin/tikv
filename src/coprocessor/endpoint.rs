@@ -239,6 +239,7 @@ impl<E: Engine> Endpoint<E> {
                         req_ctx.access_locks.clone(),
                         req.get_is_cache_enabled(),
                         false,
+                        print_info,
                     );
                     let paging_size = match req.get_paging_size() {
                         0 => None,

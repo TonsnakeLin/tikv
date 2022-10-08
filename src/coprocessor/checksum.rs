@@ -42,6 +42,7 @@ impl<S: Snapshot> ChecksumContext<S> {
             req_ctx.access_locks.clone(),
             false,
             false,
+            false,
         );
         let scanner = RangesScanner::new(RangesScannerOptions {
             storage: TiKvStorage::new(store, false),
