@@ -217,6 +217,9 @@ procinfo = { git = "https://github.com/tikv/procinfo-rs", rev = "6599eb9dca74229
 [patch.'https://github.com/pingcap/kvproto']
 # kvproto = { git = "https://github.com/your_github_id/kvproto", branch="your_branch" }
 
+[patch.'https://github.com/pingcap/tipb']
+tipb = { git = "https://github.com/TonsnakeLin/tipb", branch = "push-write-and-index-lookup" }
+
 [workspace]
 # See https://github.com/rust-lang/rfcs/blob/master/text/2957-cargo-features2.md
 # Without resolver = 2, using `cargo build --features x` to build `cmd`
