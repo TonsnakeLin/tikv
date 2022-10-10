@@ -273,6 +273,10 @@ pub trait Engine: Send + Clone + 'static {
     /// Currently, only multi-rocksdb version will return `None`.
     fn kv_engine(&self) -> Option<Self::Local>;
 
+    fn snapshot_on_kv_engine(&self, _start_key: &[u8], _end_key: &[u8]) -> Result<Snap> {
+        unimplemented!()
+    }
+
     /// Write modifications into internal local engine directly.
     ///
     /// region_modifies records each region's modifications.

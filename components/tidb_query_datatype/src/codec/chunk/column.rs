@@ -966,7 +966,7 @@ impl Column {
         self.len() == 0
     }
 
-    #[cfg(test)]
+    // #[cfg(test)]
     pub fn decode(buf: &mut tikv_util::codec::BytesSlice<'_>, tp: FieldTypeTp) -> Result<Column> {
         let length = buf.read_u32_le()? as usize;
         let mut col = Column::new(tp, length);
