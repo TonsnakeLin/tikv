@@ -98,6 +98,12 @@ impl Queue {
     ///
     /// True when the message is pushed into queue otherwise false.
     fn push(&self, msg: RaftMessage) -> Result<(), DiscardReason> {
+        if msg.print_info {
+            info!("Queue::push"; 
+            "thd_name" => ?std::thread::current().name(), 
+            "msg" => ?msg,
+            );
+        }	
         match self.conn_state.load(Ordering::SeqCst).into() {
             ConnState::Established => match self.buf.push(msg) {
                 Ok(()) => Ok(()),
@@ -140,13 +146,22 @@ impl Queue {
     /// it will register current polling task for notifications.
     #[inline]
     fn pop(&self, ctx: &Context<'_>) -> Option<RaftMessage> {
-        self.buf.pop().or_else(|| {
+        let msg = self.buf.pop().or_else(|| {
             {
                 let mut waker = self.waker.lock().unwrap();
                 *waker = Some(ctx.waker().clone());
             }
             self.buf.pop()
-        })
+        });
+        msg.as_ref().map(|raft_msg|{
+            if raft_msg.print_info {
+                info!("Queue::pop"; 
+                "thd_name" => ?std::thread::current().name(), 
+                "raft_msg" => ?raft_msg,
+                );
+            }
+        });
+        msg
     }
 }
 
@@ -174,6 +189,8 @@ trait Buffer {
     fn wait_hint(&mut self) -> Option<Duration> {
         None
     }
+
+    fn print_info(&mut self);
 }
 
 /// A buffer for BatchRaftMessage.
@@ -244,6 +261,12 @@ impl Buffer for BatchMessageBuffer {
 
     #[inline]
     fn push(&mut self, msg: RaftMessage) {
+        if msg.print_info {
+            info!("Queue::pop"; 
+            "thd_name" => ?std::thread::current().name(), 
+            "msg" => ?msg,
+            );
+        }
         let msg_size = Self::message_size(&msg);
         // To avoid building too large batch, we limit each batch's size. Since
         // `msg_size` is estimated, `GRPC_SEND_MSG_BUF` is reserved for errors.
@@ -267,6 +290,16 @@ impl Buffer for BatchMessageBuffer {
     #[inline]
     fn flush(&mut self, sender: &mut ClientCStreamSender<BatchRaftMessage>) -> grpcio::Result<()> {
         let batch = mem::take(&mut self.batch);
+
+        for msg in batch.get_msgs() {
+            if msg.print_info {
+                info!("BatchMessageBuffer::flush"; 
+                "thd_name" => ?std::thread::current().name(), 
+                "msg" => ?msg,
+                );
+            }
+        }
+
         let res = Pin::new(sender).start_send((
             batch,
             WriteFlags::default().buffer_hint(self.overflowing.is_some()),
@@ -299,6 +332,17 @@ impl Buffer for BatchMessageBuffer {
             None
         }
     }
+
+    fn print_info(&self) {
+        for msg in self.batch.get_msgs() {
+            if msg.print_info {
+                info!("BatchMessageBuffer::print_info"; 
+                "thd_name" => ?std::thread::current().name(), 
+                "msg" => ?msg,
+                );
+            }
+        }
+    }
 }
 
 /// A buffer for non-batch RaftMessage.
@@ -324,6 +368,12 @@ impl Buffer for MessageBuffer {
 
     #[inline]
     fn push(&mut self, msg: RaftMessage) {
+        if msg.print_info {
+            info!("MessageBuffer::push"; 
+            "thd_name" => ?std::thread::current().name(), 
+            "msg" => ?msg,
+            );            
+        }
         self.batch.push_back(msg);
     }
 
@@ -335,12 +385,29 @@ impl Buffer for MessageBuffer {
     #[inline]
     fn flush(&mut self, sender: &mut ClientCStreamSender<RaftMessage>) -> grpcio::Result<()> {
         if let Some(msg) = self.batch.pop_front() {
+            if msg.print_info {
+                info!("MessageBuffer::flush"; 
+                "thd_name" => ?std::thread::current().name(), 
+                "msg" => ?msg,
+                );            
+            }
             Pin::new(sender).start_send((
                 msg,
                 WriteFlags::default().buffer_hint(!self.batch.is_empty()),
             ))
         } else {
             Ok(())
+        }
+    }
+
+    fn print_info(&self) {
+        for msg in (&self.batch).into_iter() {
+            if msg.print_info {
+                info!("MessageBuffer::print_info"; 
+                "thd_name" => ?std::thread::current().name(), 
+                "msg" => ?msg,
+                );
+            }
         }
     }
 }
@@ -440,6 +507,12 @@ where
     E: KvEngine,
 {
     fn new_snapshot_reporter(&self, msg: &RaftMessage) -> SnapshotReporter<R, E> {
+        if msg.print_info {
+            info!("AsyncRaftSender::new_snapshot_reporter"; 
+            "thd_name" => ?std::thread::current().name(), 
+            "msg" => ?msg,
+            );            
+        }
         let region_id = msg.get_region_id();
         let to_peer_id = msg.get_to_peer().get_id();
         let to_store_id = msg.get_to_peer().get_store_id();
@@ -454,6 +527,12 @@ where
     }
 
     fn send_snapshot_sock(&self, msg: RaftMessage) {
+        if msg.print_info {
+            info!("AsyncRaftSender::send_snapshot_sock"; 
+            "thd_name" => ?std::thread::current().name(), 
+            "msg" => ?msg,
+            );            
+        }
         let rep = self.new_snapshot_reporter(&msg);
         let cb = Box::new(move |res: Result<_, _>| {
             if res.is_err() {
@@ -483,6 +562,7 @@ where
                 Some(msg) => msg,
                 None => return,
             };
+            self.buffer.print_info();
             if msg.get_message().has_snapshot() {
                 self.send_snapshot_sock(msg);
                 continue;
@@ -998,6 +1078,12 @@ where
     /// the message is enqueued to buffer. Caller is expected to call `flush` to
     /// ensure all buffered messages are sent out.
     pub fn send(&mut self, msg: RaftMessage) -> result::Result<(), DiscardReason> {
+        if msg.print_info {
+            info!("RaftClient::send"; 
+            "thd_name" => ?std::thread::current().name(), 
+            "msg" => ?msg,
+            );
+        }
         let store_id = msg.get_to_peer().store_id;
         let grpc_raft_conn_num = self.builder.cfg.value().grpc_raft_conn_num as u64;
         let conn_id = if grpc_raft_conn_num == 1 {

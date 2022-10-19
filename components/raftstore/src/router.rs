@@ -238,6 +238,13 @@ impl<EK: KvEngine, ER: RaftEngine> SignificantRouter<EK> for ServerRaftStoreRout
 
 impl<EK: KvEngine, ER: RaftEngine> RaftStoreRouter<EK> for ServerRaftStoreRouter<EK, ER> {
     fn send_raft_msg(&self, msg: RaftMessage) -> RaftStoreResult<()> {
+        if msg.print_info {
+            info!(
+                "ServerRaftStoreRouter::send_raft_msg";
+                "thd_name" => ?std::thread::current().name(),
+                "msg" => ?msg,
+            );
+        }
         RaftStoreRouter::send_raft_msg(&self.router, msg)
     }
 
@@ -274,6 +281,11 @@ pub fn handle_send_error<T>(region_id: u64, e: TrySendError<T>) -> RaftStoreErro
 
 impl<EK: KvEngine, ER: RaftEngine> RaftStoreRouter<EK> for RaftRouter<EK, ER> {
     fn send_raft_msg(&self, msg: RaftMessage) -> RaftStoreResult<()> {
+        info!(
+            "RaftRouter::send_raft_msg";
+            "thd_name" => ?std::thread::current().name(),
+            "msg" => ?msg,
+        );
         let region_id = msg.get_region_id();
         self.send_raft_message(msg)
             .map_err(|e| handle_send_error(region_id, e))

@@ -327,6 +327,12 @@ where
             RaftMessage::default()
         )));
 
+        info!(
+            "RaftRouter::send_raft_message";
+            "thd_name" => ?std::thread::current().name(),
+            "msg" => ?msg,
+        );
+
         let id = msg.get_region_id();
 
         let mut heap_size = 0;

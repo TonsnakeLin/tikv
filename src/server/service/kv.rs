@@ -161,6 +161,13 @@ impl<T: RaftStoreRouter<E::Local> + 'static, E: Engine, L: LockManager, F: KvFor
         msg: RaftMessage,
         reject: bool,
     ) -> RaftStoreResult<()> {
+        if msg.print_info {
+            info!(
+                "Serive::handle_raft_message";
+                "thd_name" => ?std::thread::current().name(),
+                "msg" => ?msg,
+            );
+        }
         let to_store_id = msg.get_to_peer().get_store_id();
         if to_store_id != store_id {
             return Err(RaftStoreError::StoreNotMatch {
