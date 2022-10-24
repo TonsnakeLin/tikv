@@ -190,7 +190,7 @@ trait Buffer {
         None
     }
 
-    fn print_info(&mut self);
+    fn print_info(&self);
 }
 
 /// A buffer for BatchRaftMessage.

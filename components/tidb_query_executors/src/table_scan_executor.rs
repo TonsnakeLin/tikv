@@ -280,14 +280,6 @@ impl ScanExecutorImpl for TableScanExecutorImpl {
         let columns_len = self.schema.len();
         let mut columns = Vec::with_capacity(columns_len);
 
-        if self.print_info {
-            info!("TableScanExecutor::build_column_vec"; 
-            "thd_name" => ?std::thread::current().name(), 
-            "column_id_index" => ?self.column_id_index,
-            "primary_column_ids" => ?self.primary_column_ids,
-            "handle_indices" => ?self.handle_indices);
-        }
-
         // If there are any PK columns, for each of them, fill non-PK columns before it
         // and push the PK column.
         // For example, consider:
@@ -301,6 +293,14 @@ impl ScanExecutorImpl for TableScanExecutorImpl {
             .column_id_index
             .get(&table::EXTRA_PHYSICAL_TABLE_ID_COL_ID)
             .copied();
+            if self.print_info {
+                info!("TableScanExecutor::build_column_vec"; 
+                "thd_name" => ?std::thread::current().name(), 
+                "column_id_index" => ?self.column_id_index,
+                "primary_column_ids" => ?self.primary_column_ids,
+                "handle_indices" => ?self.handle_indices, 
+                "physical_table_id_column_idx" => ?physical_table_id_column_idx);
+            }
         let mut last_index = 0usize;
         for handle_index in &self.handle_indices {
             // `handle_indices` is expected to be sorted.
