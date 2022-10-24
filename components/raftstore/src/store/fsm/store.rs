@@ -326,12 +326,13 @@ where
         fail_point!("send_raft_message_full", |_| Err(TrySendError::Full(
             RaftMessage::default()
         )));
-
-        info!(
-            "RaftRouter::send_raft_message";
-            "thd_name" => ?std::thread::current().name(),
-            "msg" => ?msg,
-        );
+        if msg.print_info {
+            info!(
+                "RaftRouter::send_raft_message";
+                "thd_name" => ?std::thread::current().name(),
+                "msg" => ?msg,
+            );
+        }
 
         let id = msg.get_region_id();
 
