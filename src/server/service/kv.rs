@@ -1540,7 +1540,10 @@ fn future_get<E: Engine, L: LockManager, F: KvFormat>(
                     time_detail.set_wait_wall_time_ms(stats.latency_stats.wait_wall_time_ms);
                     time_detail.set_process_wall_time_ms(stats.latency_stats.process_wall_time_ms);
                     match val {
-                        Some(val) => resp.set_value(val),
+                        Some(val) => { 
+                            // resp.set_value(val);
+                            tidb_query_executors::runner::convert_raw_value_to_chunk(&req, &mut resp, val);
+                        }
                         None => resp.set_not_found(true),
                     }
                 }
