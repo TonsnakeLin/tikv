@@ -2672,7 +2672,7 @@ dependencies = [
 [[package]]
 name = "kvproto"
 version = "0.0.2"
-source = "git+https://github.com/pingcap/kvproto.git#26e28e6a281abb927f91ef992eb8f93b39698ffa"
+source = "git+https://github.com/TonsnakeLin/kvproto?branch=get_return_chunk#95a3ca9c66629ae5dba232ea61b0f130f8f1eb55"
 dependencies = [
  "futures 0.3.15",
  "grpcio",
@@ -6514,7 +6514,7 @@ dependencies = [
 [[package]]
 name = "tipb"
 version = "0.0.1"
-source = "git+https://github.com/pingcap/tipb.git#f3286471a05a4454a1071dd5f66ac7dbf6c79ba3"
+source = "git+https://github.com/TonsnakeLin/tipb?branch=get_return_chunk#bcfbf295b6fe6575cbc55bffec52f55c5b019650"
 dependencies = [
  "futures 0.3.15",
  "grpcio",
