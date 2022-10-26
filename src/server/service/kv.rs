@@ -1542,8 +1542,12 @@ fn future_get<E: Engine, L: LockManager, F: KvFormat>(
                     match val {
                         Some(val) => { 
                             // resp.set_value(val);
-                            if let Err(e) = tidb_query_executors::runner::convert_raw_value_to_chunk(&req, 
+                            if let Err(_) = tidb_query_executors::runner::convert_raw_value_to_chunk(&req, 
                                 &mut resp, val) {
+                                let a_boxed_error = 
+                                    Box::<dyn std::error::Error + Send + Sync>::from("this is Unfortunately");
+                                let e = crate::storage::ErrorInner::Other(a_boxed_error);
+                                let e = crate::storage::Error::from(e);
                                 resp.set_error(extract_key_error(&e));
                             }
                         }

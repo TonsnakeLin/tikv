@@ -1,6 +1,6 @@
 // Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.
 
-use std::{convert::TryFrom, sync::Arc, collections::HashSet, collections::HashMap,};
+use std::{convert::TryFrom, sync::Arc};
 use codec::{number::NumberCodec, prelude::NumberDecoder};
 use fail::fail_point;
 use kvproto::coprocessor::KeyRange;
@@ -36,7 +36,7 @@ use tikv_util::{
 };
 use tipb::{
     self, Chunk, ColumnInfo, DagRequest, EncodeType, ExecType, ExecutorExecutionSummary, FieldType,
-    SelectResponse, StreamResponse, PointGet, TableInfoDetail, IndexInfoDetail,
+    SelectResponse, StreamResponse, PointGet,
 };
 
 use super::{
@@ -722,37 +722,35 @@ pub struct PointGetExecutorsRunner {
 
     encode_type: EncodeType,
 
-    context: EvalContext,
+    // context: EvalContext,
 }
 
 impl PointGetExecutorsRunner {
     pub fn new(
-        point_get: PointGet,
+        mut point_get: PointGet,
+        config: Arc<EvalConfig>,
     ) -> Result<Self> {
-        let mut table_point_get_executor;
-        let mut index_point_get_executor;
-        let mut config = EvalConfig::default();
-        let config = Arc::new(config);
-        let context = EvalContext::new(config);
-        let mut is_arrow_enable = false;
+        let table_point_get_executor;
+        let index_point_get_executor;
+        
+        let is_arrow_enable;
 
         if point_get.has_read_table() {
             index_point_get_executor = None;
 
-            let table = point_get.take_read_table();
+            let mut table = point_get.take_read_table();
             let columns_info: Vec<ColumnInfo> = table.take_columns().into();
             let primary_column_ids = table.take_primary_column_ids();
-            let primary_prefix_column_ids = table.take_primary_prefix_column_ids();
+            // let primary_prefix_column_ids = table.take_primary_prefix_column_ids();
             let is_column_filled = vec![false; columns_info.len()];
             let mut handle_indices = HandleIndicesVec::new();
             let mut schema = Vec::with_capacity(columns_info.len());
             let mut columns_default_value = Vec::with_capacity(columns_info.len());
             let mut column_id_index = HashMap::default();
-            let mut is_key_only = true;
+            // let mut is_key_only = true;
 
-            let primary_column_ids_set = primary_column_ids.iter().collect::<HashSet<_>>();
-            let primary_prefix_column_ids_set =
-            primary_prefix_column_ids.iter().collect::<HashSet<_>>();
+            // let primary_column_ids_set = primary_column_ids.iter().collect::<HashSet<_>>();
+            // let primary_prefix_column_ids_set = primary_prefix_column_ids.iter().collect::<HashSet<_>>();
 
             for (index, mut ci) in columns_info.into_iter().enumerate() {
                 // For each column info, we need to extract the following info:
@@ -767,12 +765,14 @@ impl PointGetExecutorsRunner {
                 if ci.get_pk_handle() {
                     handle_indices.push(index);
                 } else {
+                    /*
                     if !primary_column_ids_set.contains(&ci.get_column_id())
                         || primary_prefix_column_ids_set.contains(&ci.get_column_id())
                         || ci.need_restored_data()
                     {
                         is_key_only = false;
                     }
+                    */
                     column_id_index.insert(ci.get_column_id(), index);
                 }
     
@@ -781,7 +781,7 @@ impl PointGetExecutorsRunner {
                 // id are given, we will only preserve the *last* one.
             }
             is_arrow_enable = is_arrow_encodable(&schema);
-            let imp = TablePointGetExecutorImpl {
+            table_point_get_executor = Some(TablePointGetExecutorImpl {
                 context: EvalContext::new(config),
                 schema,
                 columns_default_value,
@@ -789,12 +789,11 @@ impl PointGetExecutorsRunner {
                 handle_indices,
                 primary_column_ids,
                 is_column_filled,
-            };
-            table_point_get_executor = Some(imp);            
+            });           
         }
         else {
             table_point_get_executor = None;
-            let index_info = point_get.take_read_index();
+            let mut index_info = point_get.take_read_index();
             let columns_info: Vec<ColumnInfo> = index_info.take_columns().into();
             let primary_column_ids_len = index_info.take_primary_column_ids().len();
 
@@ -848,7 +847,7 @@ impl PointGetExecutorsRunner {
                 .map(|ci| ci.get_column_id())
                 .collect();
             is_arrow_enable = is_arrow_encodable(&schema);
-            let imp = IndexPointGetExecutorImpl {
+            index_point_get_executor = Some(IndexPointGetExecutorImpl {
                 context: EvalContext::new(config),
                 schema,
                 columns_id_without_handle,
@@ -857,32 +856,32 @@ impl PointGetExecutorsRunner {
                 pid_column_cnt,
                 physical_table_id_column_cnt,
                 index_version: -1,
-            };
+            });
         } 
 
-        let encode_type = if !is_arrow_enable {
+        if !is_arrow_enable {
             warn!("the schema doesn't support arrow encoding");
             return Err(other_err!(
                 "the schema doesn't support arrow encoding"
             ));           
-        } else {
-            EncodeType::TypeChunk
-        };
+        }
+
         let output_offsets = point_get.take_output_offsets();
         Ok(Self {
             table_point_get_executor,
             index_point_get_executor,
             output_offsets,
-            encode_type,
-            context,
+            encode_type: EncodeType::TypeChunk,
+            // context: EvalContext::new(config),
         })
     }
 
     fn schema(&self) -> &[FieldType] {
-        if let Some(table) = self.table_point_get_executor {
+        if self.table_point_get_executor.is_some() {
+            let table = self.table_point_get_executor.as_ref().unwrap();
             table.schema()
         } else {
-            let index = self.index_point_get_executor.unwrap();
+            let index = self.index_point_get_executor.as_ref().unwrap();
             index.schema()
         }
     }
@@ -891,12 +890,13 @@ impl PointGetExecutorsRunner {
         key: &[u8],
         val: &[u8],
         chunk: &mut Chunk,
+        context: &mut EvalContext,
     ) -> Result<()>{
         let mut result;
-        if let Some(table_point_executor) = self.table_point_get_executor {
+        if let Some(table_point_executor) = self.table_point_get_executor.as_mut() {
             result = table_point_executor.convert_kv_to_batch_execute_result(key, &val)?;
 
-        } else if let Some(index_point_executor) = self.index_point_get_executor {
+        } else if let Some(index_point_executor) = self.index_point_get_executor.as_mut() {
             result = index_point_executor.convert_kv_to_batch_execute_result(key, &val)?;
         } else {
             unimplemented!()
@@ -923,7 +923,7 @@ impl PointGetExecutorsRunner {
                 &self.output_offsets,
                 self.schema(),
                 data,
-                &mut self.context,
+                context,
             )?;
         }
         return Ok(());        
@@ -1932,10 +1932,10 @@ impl IndexPointGetExecutorImpl {
 
 }
 
-fn convert_raw_value_to_chunk(req: &GetRequest, 
+pub fn convert_raw_value_to_chunk(req: &GetRequest, 
     resp: &mut GetResponse, val: Vec<u8>) -> Result<()>{
-    let meta = req.take_meta();
-    let mut input = CodedInputStream::from_bytes(&meta);
+    let meta = req.get_meta();
+    let mut input = CodedInputStream::from_bytes(meta);
     input.set_recursion_limit(1000);
     let mut point_get = PointGet::default();
     box_try!(point_get.merge_from(&mut input));
@@ -1945,11 +1945,13 @@ fn convert_raw_value_to_chunk(req: &GetRequest,
         return Ok(());
     }
 
-    let runner = PointGetExecutorsRunner::new(point_get)?;
+    let config = Arc::new(EvalConfig::default());
+    let mut context = EvalContext::new(config.clone());
+    let mut runner = PointGetExecutorsRunner::new(point_get, config)?;
 
     let mut chunk = Chunk::default();
 
-    runner.internal_handle_request(req.get_key(), &val, &mut chunk)?;
+    runner.internal_handle_request(req.get_key(), &val, &mut chunk, &mut context)?;
 
     resp.set_value(chunk.take_rows_data());
 
