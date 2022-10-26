@@ -51,8 +51,6 @@ use crate::index_scan_executor::{
     DecodeHandleStrategy, DecodeHandleStrategy::DecodeCommonHandle, DecodeHandleStrategy::DecodeIntHandle, DecodeHandleStrategy::NoDecode,
 };
 
-use tikv::storage::errors::extract_key_error;
-
 // TODO: The value is chosen according to some very subjective experience, which
 // is not tuned carefully. We need to benchmark to find a best value. Also we
 // may consider accepting this value from TiDB side.
