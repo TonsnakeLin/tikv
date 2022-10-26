@@ -6514,7 +6514,7 @@ dependencies = [
 [[package]]
 name = "tipb"
 version = "0.0.1"
-source = "git+https://github.com/TonsnakeLin/tipb?branch=get_return_chunk#f3c4bdf345c45b3e6e67285eb4e9edd3eaf3d284"
+source = "git+https://github.com/TonsnakeLin/tipb?branch=get_return_chunk#ee411d35cb2d4572c546c86b9768c4de4381b6da"
 dependencies = [
  "futures 0.3.15",
  "grpcio",
