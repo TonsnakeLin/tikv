@@ -189,7 +189,7 @@ impl<S: Storage> BatchExecutor for BatchIndexScanExecutor<S> {
 }
 
 #[derive(PartialEq, Debug)]
-enum DecodeHandleStrategy {
+pub enum DecodeHandleStrategy {
     NoDecode,
     DecodeIntHandle,
     DecodeCommonHandle,
@@ -356,7 +356,7 @@ impl ScanExecutorImpl for IndexScanExecutorImpl {
 }
 
 #[derive(PartialEq, Debug, Copy, Clone)]
-enum DecodeHandleOp<'a> {
+pub enum DecodeHandleOp<'a> {
     Nop,
     IntFromKey(&'a [u8]),
     IntFromValue(&'a [u8]),

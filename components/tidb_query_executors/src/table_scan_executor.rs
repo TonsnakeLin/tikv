@@ -25,7 +25,7 @@ use crate::interface::*;
 
 pub struct BatchTableScanExecutor<S: Storage>(ScanExecutor<S, TableScanExecutorImpl>);
 
-type HandleIndicesVec = SmallVec<[usize; 2]>;
+pub type HandleIndicesVec = SmallVec<[usize; 2]>;
 
 // We assign a dummy type `Box<dyn Storage<Statistics = ()>>` so that we can
 // omit the type when calling `check_supported`.

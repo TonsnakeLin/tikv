@@ -1,22 +1,30 @@
 // Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.
 
-use std::{convert::TryFrom, sync::Arc};
-
+use std::{convert::TryFrom, sync::Arc, collections::HashSet, collections::HashMap,};
+use codec::{number::NumberCodec, prelude::NumberDecoder};
 use fail::fail_point;
 use kvproto::coprocessor::KeyRange;
 use kvproto::kvrpcpb::{GetRequest, GetResponse};
 use protobuf::Message;
+use protobuf::CodedInputStream;
 use tidb_query_common::{
     execute_stats::ExecSummary,
     metrics::*,
     storage::{IntervalRange, Storage},
     Result,
 };
+use itertools::izip;
 use tidb_query_datatype::{
     codec::{
         batch::{LazyBatchColumn, LazyBatchColumnVec},
+        collation::collator::PADDING_SPACE,
+        datum,
+        datum::DatumDecoder,
+        number::NumberCodec,
         row, table,
+        row::v2::{RowSlice, V1CompatibleEncoder, decode_v2_u64},
         table::{check_index_key, INDEX_VALUE_VERSION_FLAG, MAX_OLD_ENCODED_VALUE_LEN},
+        Datum,
     },
     expr::{EvalConfig, EvalContext, EvalWarnings},
     EvalType, FieldTypeAccessor,
@@ -28,8 +36,8 @@ use tikv_util::{
     quota_limiter::QuotaLimiter,
 };
 use tipb::{
-    self, Chunk, DagRequest, EncodeType, ExecType, ExecutorExecutionSummary, FieldType,
-    SelectResponse, StreamResponse,
+    self, Chunk, ColumnInfo, DagRequest, EncodeType, ExecType, ExecutorExecutionSummary, FieldType,
+    SelectResponse, StreamResponse, PointGet, TableInfoDetail, IndexInfoDetail,
 };
 
 use super::{
@@ -37,6 +45,14 @@ use super::{
     index_scan_executor::{DecodeHandleOp, DecodePartitionIdOp, RestoreData},
     *,
 };
+
+use crate::table_scan_executor::HandleIndicesVec;
+use crate::util::scan_executor::field_type_from_column_info;
+use crate::index_scan_executor::{
+    DecodeHandleStrategy, DecodeHandleStrategy::DecodeCommonHandle, DecodeHandleStrategy::DecodeIntHandle, DecodeHandleStrategy::NoDecode,
+};
+
+use storage::errors::extract_key_error;
 
 // TODO: The value is chosen according to some very subjective experience, which
 // is not tuned carefully. We need to benchmark to find a best value. Also we
@@ -156,6 +172,12 @@ impl BatchExecutorsRunner<()> {
                 }
                 ExecType::TypePartitionTableScan => {
                     other_err!("PartitionTableScan executor not implemented");
+                }
+                ExecType::TypeSort => {
+                    other_err!("TypeSort executor not implemented");
+                }
+                ExecType::TypeWindow => {
+                    other_err!("TypeWindow executor not implemented");
                 }
             }
         }
@@ -702,22 +724,26 @@ pub struct PointGetExecutorsRunner {
     output_offsets: Vec<u32>,
 
     encode_type: EncodeType,
+
+    context: EvalContext,
 }
 
 impl PointGetExecutorsRunner {
     pub fn new(
-        req: GetRequest
+        point_get: PointGet,
     ) -> Result<Self> {
         let mut table_point_get_executor;
         let mut index_point_get_executor;
         let mut config = EvalConfig::default();
         let config = Arc::new(config);
+        let context = EvalContext::new(config);
+        let mut is_arrow_enable = false;
 
-        if req.meta.table_info {
+        if point_get.has_read_table() {
             index_point_get_executor = None;
 
-            let table = req.meta.table_info;
-            let columns_info = table.take_columns().into();
+            let table = point_get.take_read_table();
+            let columns_info: Vec<ColumnInfo> = table.take_columns().into();
             let primary_column_ids = table.take_primary_column_ids();
             let primary_prefix_column_ids = table.take_primary_prefix_column_ids();
             let is_column_filled = vec![false; columns_info.len()];
@@ -757,7 +783,7 @@ impl PointGetExecutorsRunner {
                 // *last* one. Also if two columns with the same column
                 // id are given, we will only preserve the *last* one.
             }
-
+            is_arrow_enable = is_arrow_encodable(&schema);
             let imp = TablePointGetExecutorImpl {
                 context: EvalContext::new(config),
                 schema,
@@ -771,7 +797,7 @@ impl PointGetExecutorsRunner {
         }
         else {
             table_point_get_executor = None;
-            let index_info = req.meta.index_info;
+            let index_info = point_get.take_read_index();
             let columns_info = index_info.take_columns().into();
             let primary_column_ids_len = index_info.take_primary_column_ids().len();
 
@@ -824,7 +850,7 @@ impl PointGetExecutorsRunner {
                 .iter()
                 .map(|ci| ci.get_column_id())
                 .collect();
-            
+            is_arrow_enable = is_arrow_encodable(&schema);
             let imp = IndexPointGetExecutorImpl {
                 context: EvalContext::new(config),
                 schema,
@@ -837,18 +863,21 @@ impl PointGetExecutorsRunner {
             };
         } 
 
-        let encode_type = if !is_arrow_encodable(self.schema()) {
+        let encode_type = if !is_arrow_enable {
             warn!("the schema doesn't support arrow encoding");
-            EncodeType::TypeDefault
+            return Err(other_err!(
+                "the schema doesn't support arrow encoding"
+            ));           
         } else {
-            req.get_encode_type()
+            EncodeType::TypeChunk
         };
-        let output_offsets = req.take_output_offsets();
+        let output_offsets = point_get.take_output_offsets();
         Ok(Self {
             table_point_get_executor,
             index_point_get_executor,
             output_offsets,
             encode_type,
+            context,
         })
     }
 
@@ -856,22 +885,22 @@ impl PointGetExecutorsRunner {
         if let Some(table) = self.table_point_get_executor {
             table.schema()
         } else {
-            self.index_point_get_executor.map(|index|index.schema())
+            let index = self.index_point_get_executor.unwrap();
+            index.schema()
         }
     }
 
     fn internal_handle_request(&mut self,
         key: &[u8],
-        value: &[u8],
+        val: &[u8],
         chunk: &mut Chunk,
-        ctx: &mut EvalContext,
-    ) -> Result(()){
+    ) -> Result<()>{
         let mut result;
         if let Some(table_point_executor) = self.table_point_get_executor {
-            result = table_point_executor.convert_kv_to_batch_execute_result(req.get_key(), &val)?;
+            result = table_point_executor.convert_kv_to_batch_execute_result(key, &val)?;
 
         } else if let Some(index_point_executor) = self.index_point_get_executor {
-            result = index_point_executor.convert_kv_to_batch_execute_result(req.get_key(), &val)?;
+            result = index_point_executor.convert_kv_to_batch_execute_result(key, &val)?;
         } else {
             unimplemented!()
         }
@@ -879,7 +908,7 @@ impl PointGetExecutorsRunner {
         assert!(!result.logical_rows.is_empty());
         assert_eq!(
             result.physical_columns.columns_len(),
-            table_point_executor.schema().len()
+            self.schema().len()
         );
 
         let data = chunk.mut_rows_data();
@@ -897,7 +926,7 @@ impl PointGetExecutorsRunner {
                 &self.output_offsets,
                 self.schema(),
                 data,
-                ctx,
+                &mut self.context,
             )?;
         }
         return Ok(());        
@@ -938,6 +967,7 @@ impl TablePointGetExecutorImpl {
         &self.schema
     }
     fn build_column_vec(&self) -> LazyBatchColumnVec {
+        let scan_rows = 1;
         let columns_len = self.schema.len();
         let mut columns = Vec::with_capacity(columns_len);
 
@@ -1004,8 +1034,8 @@ impl TablePointGetExecutorImpl {
 
     fn fill_column_vec(
         &mut self,
-        key: &Vec<u8>,
-        value: &Vec<u8>,
+        key: &[u8],
+        value: &[u8],
         columns: &mut LazyBatchColumnVec,
     ) -> Result<()> {
 
@@ -1131,12 +1161,12 @@ impl TablePointGetExecutorImpl {
         logical_columns.assert_columns_equal_length();
         let logical_rows = (0..logical_columns.rows_len()).collect();        
 
-        Ok((BatchExecuteResult {
+        Ok(BatchExecuteResult {
             physical_columns: logical_columns,
             logical_rows,
-            is_drained,
+            is_drained: Ok(true),
             warnings: self.context.take_warnings(),
-        }))
+        })
     }
 
     fn process_v1(
@@ -1194,11 +1224,6 @@ impl TablePointGetExecutorImpl {
         columns: &mut LazyBatchColumnVec,
         decoded_columns: &mut usize,
     ) -> Result<()> {
-        use tidb_query_datatype::codec::{
-            datum,
-            row::v2::{RowSlice, V1CompatibleEncoder},
-        };
-
         let row = RowSlice::from_bytes(value)?;
         for (col_id, idx) in &self.column_id_index {
             if self.is_column_filled[*idx] {
@@ -1270,12 +1295,12 @@ impl IndexPointGetExecutorImpl {
         logical_columns.assert_columns_equal_length();
         let logical_rows = (0..logical_columns.rows_len()).collect();        
 
-        Ok((BatchExecuteResult {
+        Ok(BatchExecuteResult {
             physical_columns: logical_columns,
             logical_rows,
-            is_drained,
+            is_drained: Ok(true),
             warnings: self.context.take_warnings(),
-        }))
+        })
     }
 
     /// Constructs empty columns, with PK containing int handle in decoded
@@ -1893,17 +1918,31 @@ impl IndexPointGetExecutorImpl {
 
 }
 
+fn convert_raw_value_to_chunk(req: &GetRequest, resp: &mut GetResponse, val: Vec<u8>) {
+    let meta = req.take_meta();
+    let mut input = CodedInputStream::from_bytes(&meta);
+    input.set_recursion_limit(1000);
+    let mut point_get = PointGet::default();
+    box_try!(point_get.merge_from(&mut input));
 
-fn convert_raw_value_to_chunk(req: &GetRequest,resp: &mut GetResponse, val: Vec<u8>) {
-    if req.encode_type != EncodeType::TypeChunk {
+    if point_get.get_encode_type() != EncodeType::TypeChunk {
         resp.set_value(val);
         return ;
     }
-    let runner = PointGetExecutorsRunner::new(req).unwrap();
+
+    let runner = match PointGetExecutorsRunner::new(point_get) {
+        Err(e) => {
+            resp.set_error(extract_key_error(&e));
+            return;
+        }
+        Ok(runner) => {
+            runner
+        }
+    };
 
     let mut chunk = Chunk::default();
 
-    match runner.internal_handle_request(req.get_key(), &value, &mut chunk, ctx) {
+    match runner.internal_handle_request(req.get_key(), &val, &mut chunk) {
         Err(e) => {
             resp.set_error(extract_key_error(&e));
         }
@@ -1911,4 +1950,5 @@ fn convert_raw_value_to_chunk(req: &GetRequest,resp: &mut GetResponse, val: Vec<
             resp.set_value(chunk.take_rows_data());
         }
     }
+    return;
 }
