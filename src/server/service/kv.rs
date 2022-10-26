@@ -1542,7 +1542,10 @@ fn future_get<E: Engine, L: LockManager, F: KvFormat>(
                     match val {
                         Some(val) => { 
                             // resp.set_value(val);
-                            tidb_query_executors::runner::convert_raw_value_to_chunk(&req, &mut resp, val);
+                            if let Err(e) = tidb_query_executors::runner::convert_raw_value_to_chunk(&req, 
+                                &mut resp, val) {
+                                resp.set_error(extract_key_error(&e));
+                            }
                         }
                         None => resp.set_not_found(true),
                     }

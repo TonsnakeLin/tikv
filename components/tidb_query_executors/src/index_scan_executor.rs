@@ -364,14 +364,14 @@ pub enum DecodeHandleOp<'a> {
 }
 
 #[derive(PartialEq, Debug, Copy, Clone)]
-enum RestoreData<'a> {
+pub enum RestoreData<'a> {
     NotExists,
     V4(&'a [u8]),
     V5(&'a [u8]),
 }
 
 #[derive(PartialEq, Debug, Copy, Clone)]
-enum DecodePartitionIdOp<'a> {
+pub enum DecodePartitionIdOp<'a> {
     Nop,
     Pid(&'a [u8]),
 }

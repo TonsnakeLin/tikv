@@ -20,7 +20,6 @@ use tidb_query_datatype::{
         collation::collator::PADDING_SPACE,
         datum,
         datum::DatumDecoder,
-        number::NumberCodec,
         row, table,
         row::v2::{RowSlice, V1CompatibleEncoder, decode_v2_u64},
         table::{check_index_key, INDEX_VALUE_VERSION_FLAG, MAX_OLD_ENCODED_VALUE_LEN},
@@ -52,7 +51,7 @@ use crate::index_scan_executor::{
     DecodeHandleStrategy, DecodeHandleStrategy::DecodeCommonHandle, DecodeHandleStrategy::DecodeIntHandle, DecodeHandleStrategy::NoDecode,
 };
 
-use storage::errors::extract_key_error;
+use tikv::storage::errors::extract_key_error;
 
 // TODO: The value is chosen according to some very subjective experience, which
 // is not tuned carefully. We need to benchmark to find a best value. Also we
@@ -798,7 +797,7 @@ impl PointGetExecutorsRunner {
         else {
             table_point_get_executor = None;
             let index_info = point_get.take_read_index();
-            let columns_info = index_info.take_columns().into();
+            let columns_info: Vec<ColumnInfo> = index_info.take_columns().into();
             let primary_column_ids_len = index_info.take_primary_column_ids().len();
 
             let physical_table_id_column_cnt = columns_info.last().map_or(0, |ci| {
@@ -1059,8 +1058,6 @@ impl TablePointGetExecutorImpl {
         value: &[u8],
         columns: &mut LazyBatchColumnVec,
     ) -> Result<()> {
-        use tidb_query_datatype::codec::datum;
-
         let columns_len = self.schema.len();
         let mut decoded_columns = 0;
 
@@ -1176,8 +1173,6 @@ impl TablePointGetExecutorImpl {
         columns: &mut LazyBatchColumnVec,
         decoded_columns: &mut usize,
     ) -> Result<()> {
-        use codec::prelude::NumberDecoder;
-        use tidb_query_datatype::codec::datum;
         // The layout of value is: [col_id_1, value_1, col_id_2, value_2, ...]
         // where each element is datum encoded.
         // The column id datum must be in var i64 type.
@@ -1301,6 +1296,27 @@ impl IndexPointGetExecutorImpl {
             is_drained: Ok(true),
             warnings: self.context.take_warnings(),
         })
+    }
+
+    fn fill_column_vec(
+        &mut self,
+        key: &[u8],
+        value: &[u8],
+        columns: &mut LazyBatchColumnVec,
+    ) -> Result<()> {
+
+        if let Err(e) = self.process_kv_pair(&key, &value, columns) {
+            // When there are errors in `process_kv_pair`, columns' length may not be
+            // identical. For example, the filling process may be partially done so that
+            // first several columns have N rows while the rest have N-1 rows. Since we do
+            // not immediately fail when there are errors, these irregular columns may
+            // further cause future executors to panic. So let's truncate these columns to
+            // make they all have N-1 rows in that case.
+            columns.truncate_into_equal_length();
+            return Err(e);
+        }       
+
+        Ok(())
     }
 
     /// Constructs empty columns, with PK containing int handle in decoded
@@ -1918,7 +1934,8 @@ impl IndexPointGetExecutorImpl {
 
 }
 
-fn convert_raw_value_to_chunk(req: &GetRequest, resp: &mut GetResponse, val: Vec<u8>) {
+fn convert_raw_value_to_chunk(req: &GetRequest, 
+    resp: &mut GetResponse, val: Vec<u8>) -> Result<()>{
     let meta = req.take_meta();
     let mut input = CodedInputStream::from_bytes(&meta);
     input.set_recursion_limit(1000);
@@ -1927,28 +1944,16 @@ fn convert_raw_value_to_chunk(req: &GetRequest, resp: &mut GetResponse, val: Vec
 
     if point_get.get_encode_type() != EncodeType::TypeChunk {
         resp.set_value(val);
-        return ;
+        return Ok(());
     }
 
-    let runner = match PointGetExecutorsRunner::new(point_get) {
-        Err(e) => {
-            resp.set_error(extract_key_error(&e));
-            return;
-        }
-        Ok(runner) => {
-            runner
-        }
-    };
+    let runner = PointGetExecutorsRunner::new(point_get)?;
 
     let mut chunk = Chunk::default();
 
-    match runner.internal_handle_request(req.get_key(), &val, &mut chunk) {
-        Err(e) => {
-            resp.set_error(extract_key_error(&e));
-        }
-        Ok(_) => {
-            resp.set_value(chunk.take_rows_data());
-        }
-    }
-    return;
+    runner.internal_handle_request(req.get_key(), &val, &mut chunk)?;
+
+    resp.set_value(chunk.take_rows_data());
+
+    return Ok(());
 }
