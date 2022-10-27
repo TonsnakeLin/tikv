@@ -1,6 +1,6 @@
 // Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.
 
-use std::{convert::TryFrom, sync::Arc};
+use std::{convert::TryFrom, sync::Arc, collections::{HashMap, }};
 use codec::{number::NumberCodec, prelude::NumberDecoder};
 use fail::fail_point;
 use kvproto::coprocessor::KeyRange;
@@ -1276,6 +1276,7 @@ impl IndexPointGetExecutorImpl {
     }
 
     #[inline]
+    #[allow(dead_code)]
     fn mut_context(&mut self) -> &mut EvalContext {
         &mut self.context
     }
