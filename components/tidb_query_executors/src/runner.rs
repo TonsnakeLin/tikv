@@ -1950,7 +1950,12 @@ pub fn convert_raw_value_to_chunk(req: &GetRequest,
         resp.set_value(val);
         return Ok(());
     }
-
+    /*
+    info!("get request uses chunk rpc";
+        "key" => log_wrappers::Value::key(req.get_key()),
+        "value" => log_wrappers::Value::value(&val),
+    );
+    */
     let config = Arc::new(EvalConfig::default());
     let mut context = EvalContext::new(config.clone());
     let mut runner = PointGetExecutorsRunner::new(point_get, config)?;
