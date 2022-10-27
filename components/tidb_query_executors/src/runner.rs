@@ -1945,6 +1945,11 @@ pub fn convert_raw_value_to_chunk(req: &GetRequest,
         return Ok(());
     }
 
+    if !point_get.has_read_index() && !point_get.has_read_table() {
+        resp.set_value(val);
+        return Ok(());
+    }
+
     let config = Arc::new(EvalConfig::default());
     let mut context = EvalContext::new(config.clone());
     let mut runner = PointGetExecutorsRunner::new(point_get, config)?;
