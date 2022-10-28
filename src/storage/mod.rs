@@ -727,6 +727,155 @@ impl<E: Engine, L: LockManager, F: KvFormat> Storage<E, L, F> {
         }
     }
 
+    pub fn sync_get(
+        &self,
+        mut ctx: Context,
+        key: Key,
+        start_ts: TimeStamp,
+    ) -> impl Future<Output = Result<(Option<Value>, KvGetStatistics)>> {
+        let stage_begin_ts = Instant::now();
+        const CMD: CommandKind = CommandKind::get;
+        let priority = ctx.get_priority();
+        let priority_tag = get_priority_tag(priority);
+        let resource_tag = self.resource_tag_factory.new_tag_with_key_ranges(
+            &ctx,
+            vec![(key.as_encoded().to_vec(), key.as_encoded().to_vec())],
+        );
+        let concurrency_manager = self.concurrency_manager.clone();
+        let api_version = self.api_version;
+
+        let quota_limiter = self.quota_limiter.clone();
+        let mut sample = quota_limiter.new_sample(true);
+
+        let res = 
+            async move {
+                let stage_scheduled_ts = Instant::now();
+                tls_collect_query(
+                    ctx.get_region_id(),
+                    ctx.get_peer(),
+                    key.as_encoded(),
+                    key.as_encoded(),
+                    false,
+                    QueryKind::Get,
+                );
+
+                KV_COMMAND_COUNTER_VEC_STATIC.get(CMD).inc();
+                SCHED_COMMANDS_PRI_COUNTER_VEC_STATIC
+                    .get(priority_tag)
+                    .inc();
+
+                Self::check_api_version(api_version, ctx.api_version, CMD, [key.as_encoded()])?;
+
+                let command_duration = tikv_util::time::Instant::now();
+
+                // The bypass_locks and access_locks set will be checked at most once.
+                // `TsSet::vec` is more efficient here.
+                let bypass_locks = TsSet::vec_from_u64s(ctx.take_resolved_locks());
+                let access_locks = TsSet::vec_from_u64s(ctx.take_committed_locks());
+
+                let snap_ctx = prepare_snap_ctx(
+                    &ctx,
+                    iter::once(&key),
+                    start_ts,
+                    &bypass_locks,
+                    &concurrency_manager,
+                    CMD,
+                )?;
+                let snapshot =
+                    Self::with_tls_engine(|engine| Self::snapshot(engine, snap_ctx)).await?;
+
+                {
+                    let begin_instant = Instant::now();
+                    let stage_snap_recv_ts = begin_instant;
+                    let buckets = snapshot.ext().get_buckets();
+                    let mut statistics = Statistics::default();
+                    let result = Self::with_perf_context(CMD, || {
+                        let _guard = sample.observe_cpu();
+                        let snap_store = SnapshotStore::new(
+                            snapshot,
+                            start_ts,
+                            ctx.get_isolation_level(),
+                            !ctx.get_not_fill_cache(),
+                            bypass_locks,
+                            access_locks,
+                            false,
+                        );
+                        snap_store
+                        .get(&key, &mut statistics)
+                        // map storage::txn::Error -> storage::Error
+                        .map_err(Error::from)
+                        .map(|r| {
+                            KV_COMMAND_KEYREAD_HISTOGRAM_STATIC.get(CMD).observe(1_f64);
+                            r
+                        })
+                    });
+                    metrics::tls_collect_scan_details(CMD, &statistics);
+                    metrics::tls_collect_read_flow(
+                        ctx.get_region_id(),
+                        Some(key.as_encoded()),
+                        Some(key.as_encoded()),
+                        &statistics,
+                        buckets.as_ref(),
+                    );
+                    SCHED_PROCESSING_READ_HISTOGRAM_STATIC
+                        .get(CMD)
+                        .observe(begin_instant.saturating_elapsed_secs());
+                    SCHED_HISTOGRAM_VEC_STATIC
+                        .get(CMD)
+                        .observe(command_duration.saturating_elapsed_secs());
+
+                    let read_bytes = key.len()
+                        + result
+                            .as_ref()
+                            .unwrap_or(&None)
+                            .as_ref()
+                            .map_or(0, |v| v.len());
+                    sample.add_read_bytes(read_bytes);
+                    let quota_delay = quota_limiter.consume_sample(sample, true).await;
+                    if !quota_delay.is_zero() {
+                        TXN_COMMAND_THROTTLE_TIME_COUNTER_VEC_STATIC
+                            .get(CMD)
+                            .inc_by(quota_delay.as_micros() as u64);
+                    }
+
+                    let stage_finished_ts = Instant::now();
+                    let schedule_wait_time =
+                        stage_scheduled_ts.saturating_duration_since(stage_begin_ts);
+                    let snapshot_wait_time =
+                        stage_snap_recv_ts.saturating_duration_since(stage_scheduled_ts);
+                    let wait_wall_time =
+                        stage_snap_recv_ts.saturating_duration_since(stage_begin_ts);
+                    let process_wall_time =
+                        stage_finished_ts.saturating_duration_since(stage_snap_recv_ts);
+                    let latency_stats = StageLatencyStats {
+                        schedule_wait_time_ms: duration_to_ms(schedule_wait_time),
+                        snapshot_wait_time_ms: duration_to_ms(snapshot_wait_time),
+                        wait_wall_time_ms: duration_to_ms(wait_wall_time),
+                        process_wall_time_ms: duration_to_ms(process_wall_time),
+                    };
+                    with_tls_tracker(|tracker| {
+                        tracker.metrics.read_pool_schedule_wait_nanos =
+                            schedule_wait_time.as_nanos() as u64;
+                    });
+                    Ok((
+                        result?,
+                        KvGetStatistics {
+                            stats: statistics,
+                            latency_stats,
+                        },
+                    ))
+                }
+            };
+        async move {
+            res.await
+        }
+        /*
+        async move {
+            res.map_err(|_| Error::from(ErrorInner::SchedTooBusy)).await
+        }
+        */
+    }
+
     /// Get values of a set of keys with separate context from a snapshot,
     /// return a list of `Result`s.
     ///

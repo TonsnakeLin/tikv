@@ -1353,7 +1353,8 @@ fn handle_batch_commands_request<
                         batcher.as_mut().unwrap().add_get_request(req, id);
                     } else {
                        let begin_instant = Instant::now();
-                       let source = req.mut_context().take_request_source();
+                       // let source = req.mut_context().take_request_source();
+                       let source = String::from(req.mut_context().get_request_source());
                        let resp = future_get(storage, req)
                             .map_ok(oneof!(batch_commands_response::response::Cmd::Get))
                             .map_err(|_| GRPC_MSG_FAIL_COUNTER.kv_get.inc());
@@ -1507,6 +1508,7 @@ fn future_get<E: Engine, L: LockManager, F: KvFormat>(
     storage: &Storage<E, L, F>,
     mut req: GetRequest,
 ) -> impl Future<Output = ServerResult<GetResponse>> {
+    let request_source = String::from(req.mut_context().get_request_source());
     let tracker = GLOBAL_TRACKERS.insert(Tracker::new(RequestInfo::new(
         req.get_context(),
         RequestType::KvGet,
@@ -1514,14 +1516,23 @@ fn future_get<E: Engine, L: LockManager, F: KvFormat>(
     )));
     set_tls_tracker_token(tracker);
     let start = Instant::now();
-    let v = storage.get(
+
+    let v = storage.sync_get(
         req.take_context(),
         Key::from_raw(req.get_key()),
         req.get_version().into(),
     );
-
+    if request_source.contains("external_") {
+        info!("thd_name {:?} future_get after storage.sync_get {:?}",std::thread::current().name(), req);
+    }
     async move {
+        if request_source.contains("external_") {
+            info!("thd_name {:?} future_get of stage2 ",std::thread::current().name());
+        }
         let v = v.await;
+        if request_source.contains("external_") {
+            info!("thd_name {:?} future_get of stage3 ",std::thread::current().name());
+        }
         let duration_ms = duration_to_ms(start.saturating_elapsed());
         let mut resp = GetResponse::default();
         if let Some(err) = extract_region_error(&v) {
@@ -1561,6 +1572,7 @@ fn future_get<E: Engine, L: LockManager, F: KvFormat>(
         Ok(resp)
     }
 }
+
 
 fn future_scan<E: Engine, L: LockManager, F: KvFormat>(
     storage: &Storage<E, L, F>,
