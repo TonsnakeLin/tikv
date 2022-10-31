@@ -560,6 +560,13 @@ pub fn set_tls_engine<E: Engine>(engine: E) {
     });
 }
 
+pub unsafe fn tls_engine_is_null() -> bool {
+    TLS_ENGINE_ANY.with(|e| {
+        let ptr = *e.get();
+        ptr.is_null()
+    })  
+}
+
 /// Destroy the thread local engine.
 ///
 /// Postcondition: `TLS_ENGINE_ANY` is null.

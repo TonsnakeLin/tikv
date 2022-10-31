@@ -1094,6 +1094,16 @@ impl<T: RaftStoreRouter<E::Local> + 'static, E: Engine, L: LockManager, F: KvFor
         let pool_size = storage.get_normal_pool_size();
         let batch_builder = BatcherBuilder::new(self.enable_req_batch, pool_size);
         let ch = self.ch.clone();
+        /*
+        unsafe {
+            if tls_engine_is_null() {
+                info!("tls engine is null");
+                let raftkv = Arc::new(Mutex::new(engine));
+                let engine = raftkv.lock().unwrap().clone();
+                set_tls_engine(engine);
+            }
+        }
+        */
         let request_handler = stream.try_for_each(move |mut req| {
             let request_ids = req.take_request_ids();
             let requests: Vec<_> = req.take_requests().into();
@@ -1355,7 +1365,7 @@ fn handle_batch_commands_request<
                        let begin_instant = Instant::now();
                        // let source = req.mut_context().take_request_source();
                        let source = String::from(req.mut_context().get_request_source());
-                       let resp = future_get(storage, req)
+                       let resp = future_get2(storage, req)
                             .map_ok(oneof!(batch_commands_response::response::Cmd::Get))
                             .map_err(|_| GRPC_MSG_FAIL_COUNTER.kv_get.inc());
                         response_batch_commands_request(id, resp, tx.clone(), begin_instant, GrpcTypeKind::kv_get, source);
@@ -1508,6 +1518,66 @@ fn future_get<E: Engine, L: LockManager, F: KvFormat>(
     storage: &Storage<E, L, F>,
     mut req: GetRequest,
 ) -> impl Future<Output = ServerResult<GetResponse>> {
+    info!("future_get begin to future_get");
+    let tracker = GLOBAL_TRACKERS.insert(Tracker::new(RequestInfo::new(
+        req.get_context(),
+        RequestType::KvGet,
+        req.get_version(),
+    )));
+    set_tls_tracker_token(tracker);
+    let start = Instant::now();
+    let v = storage.get(
+        req.take_context(),
+        Key::from_raw(req.get_key()),
+        req.get_version().into(),
+    );
+
+    async move {
+        let v = v.await;
+        let duration_ms = duration_to_ms(start.saturating_elapsed());
+        let mut resp = GetResponse::default();
+        if let Some(err) = extract_region_error(&v) {
+            resp.set_region_error(err);
+        } else {
+            match v {
+                Ok((val, stats)) => {
+                    let exec_detail_v2 = resp.mut_exec_details_v2();
+                    let scan_detail_v2 = exec_detail_v2.mut_scan_detail_v2();
+                    stats.stats.write_scan_detail(scan_detail_v2);
+                    GLOBAL_TRACKERS.with_tracker(tracker, |tracker| {
+                        tracker.write_scan_detail(scan_detail_v2);
+                    });
+                    let time_detail = exec_detail_v2.mut_time_detail();
+                    time_detail.set_kv_read_wall_time_ms(duration_ms);
+                    time_detail.set_wait_wall_time_ms(stats.latency_stats.wait_wall_time_ms);
+                    time_detail.set_process_wall_time_ms(stats.latency_stats.process_wall_time_ms);
+                    match val {
+                        Some(val) => { 
+                            // resp.set_value(val);
+                            if let Err(_) = tidb_query_executors::runner::convert_raw_value_to_chunk(&req, 
+                                &mut resp, val) {
+                                let a_boxed_error = 
+                                    Box::<dyn std::error::Error + Send + Sync>::from("this is Unfortunately");
+                                let e = crate::storage::ErrorInner::Other(a_boxed_error);
+                                let e = crate::storage::Error::from(e);
+                                resp.set_error(extract_key_error(&e));
+                            }
+                        }
+                        None => resp.set_not_found(true),
+                    }
+                }
+                Err(e) => resp.set_error(extract_key_error(&e)),
+            }
+        }
+        GLOBAL_TRACKERS.remove(tracker);
+        Ok(resp)
+    }
+}
+
+fn future_get2<E: Engine, L: LockManager, F: KvFormat>(
+    storage: &Storage<E, L, F>,
+    mut req: GetRequest,
+) -> impl Future<Output = ServerResult<GetResponse>> {
     let request_source = String::from(req.mut_context().get_request_source());
     let tracker = GLOBAL_TRACKERS.insert(Tracker::new(RequestInfo::new(
         req.get_context(),
@@ -1516,23 +1586,29 @@ fn future_get<E: Engine, L: LockManager, F: KvFormat>(
     )));
     set_tls_tracker_token(tracker);
     let start = Instant::now();
-
-    let v = storage.sync_get(
+    
+    let v = storage.get2(
         req.take_context(),
         Key::from_raw(req.get_key()),
         req.get_version().into(),
     );
+    /*
     if request_source.contains("external_") {
-        info!("thd_name {:?} future_get after storage.sync_get {:?}",std::thread::current().name(), req);
+        info!("thd_name {:?} future_get2 after storage.get2 {:?}",std::thread::current().name(), req);
     }
+    */
     async move {
+        /*
         if request_source.contains("external_") {
-            info!("thd_name {:?} future_get of stage2 ",std::thread::current().name());
+            info!("thd_name {:?} future_get2 of stage2 ",std::thread::current().name());
         }
+        */
         let v = v.await;
+        /*
         if request_source.contains("external_") {
-            info!("thd_name {:?} future_get of stage3 ",std::thread::current().name());
+            info!("thd_name {:?} future_get2 of stage3 ",std::thread::current().name());
         }
+        */
         let duration_ms = duration_to_ms(start.saturating_elapsed());
         let mut resp = GetResponse::default();
         if let Some(err) = extract_region_error(&v) {
