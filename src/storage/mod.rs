@@ -67,7 +67,6 @@ use std::{
     sync::{
         atomic::{self, AtomicBool},
         Arc,
-        Mutex,
     },
 };
 
@@ -117,7 +116,7 @@ use crate::{
     server::lock_manager::waiter_manager,
     storage::{
         config::Config,
-        kv::{with_tls_engine, set_tls_engine, tls_engine_is_null, Modify, WriteData},
+        kv::{with_tls_engine, Modify, WriteData},
         lock_manager::{DummyLockManager, LockManager},
         metrics::{CommandKind, *},
         mvcc::{MvccReader, PointGetterBuilder},
@@ -748,7 +747,8 @@ impl<E: Engine, L: LockManager, F: KvFormat> Storage<E, L, F> {
 
         let quota_limiter = self.quota_limiter.clone();
         let mut sample = quota_limiter.new_sample(true);
-
+        let mut engine = self.engine.clone();
+        /*
         unsafe {
             if tls_engine_is_null() {
                 info!("tls engine is null");
@@ -757,7 +757,8 @@ impl<E: Engine, L: LockManager, F: KvFormat> Storage<E, L, F> {
                 set_tls_engine(engine);
             }
         }
-
+        */
+        
         let res = 
             async move {
                 let stage_scheduled_ts = Instant::now();
@@ -793,14 +794,13 @@ impl<E: Engine, L: LockManager, F: KvFormat> Storage<E, L, F> {
                     CMD,
                 )?;
                 let snapshot =
-                    Self::with_tls_engine(|engine| Self::snapshot(engine, snap_ctx)).await?;
-
+                    Self::snapshot(&mut engine, snap_ctx).await?;
                 {
                     let begin_instant = Instant::now();
                     let stage_snap_recv_ts = begin_instant;
                     let buckets = snapshot.ext().get_buckets();
                     let mut statistics = Statistics::default();
-                    let result = Self::with_perf_context(CMD, || {
+                    let result = with_perf_context_in_engine(CMD, &mut engine, || {
                         let _guard = sample.observe_cpu();
                         let snap_store = SnapshotStore::new(
                             snapshot,
