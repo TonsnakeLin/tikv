@@ -99,6 +99,8 @@ pub struct Service<T: RaftStoreRouter<E::Local> + 'static, E: Engine, L: LockMan
 
     // Go `server::Config` to get more details.
     reject_messages_on_memory_ratio: f64,
+
+    grpc_execute_small_request: bool,
 }
 
 impl<
@@ -122,6 +124,7 @@ impl<
             grpc_thread_load: self.grpc_thread_load.clone(),
             proxy: self.proxy.clone(),
             reject_messages_on_memory_ratio: self.reject_messages_on_memory_ratio,
+            grpc_execute_small_request: self.grpc_execute_small_request,
         }
     }
 }
@@ -143,6 +146,7 @@ impl<T: RaftStoreRouter<E::Local> + 'static, E: Engine, L: LockManager, F: KvFor
         enable_req_batch: bool,
         proxy: Proxy,
         reject_messages_on_memory_ratio: f64,
+        grpc_execute_small_request: bool,
     ) -> Self {
         Service {
             store_id,
@@ -157,6 +161,7 @@ impl<T: RaftStoreRouter<E::Local> + 'static, E: Engine, L: LockManager, F: KvFor
             grpc_thread_load,
             proxy,
             reject_messages_on_memory_ratio,
+            grpc_execute_small_request,
         }
     }
 
@@ -1094,6 +1099,7 @@ impl<T: RaftStoreRouter<E::Local> + 'static, E: Engine, L: LockManager, F: KvFor
         let pool_size = storage.get_normal_pool_size();
         let batch_builder = BatcherBuilder::new(self.enable_req_batch, pool_size);
         let ch = self.ch.clone();
+        let grpc_execute_request = self.grpc_execute_small_request;
         /*
         unsafe {
             if tls_engine_is_null() {
@@ -1121,6 +1127,7 @@ impl<T: RaftStoreRouter<E::Local> + 'static, E: Engine, L: LockManager, F: KvFor
                     req,
                     &tx,
                     &ch,
+                    grpc_execute_request,
                 );
                 if let Some(batch) = batcher.as_mut() {
                     batch.maybe_commit(&storage, &tx);
@@ -1336,6 +1343,7 @@ fn handle_batch_commands_request<
     req: batch_commands_request::Request,
     tx: &Sender<MeasuredSingleResponse>,
     ch: &T,
+    grpc_exeucte_request: bool,
 ) {
     // To simplify code and make the logic more clear.
     macro_rules! oneof {
@@ -1365,10 +1373,17 @@ fn handle_batch_commands_request<
                        let begin_instant = Instant::now();
                        // let source = req.mut_context().take_request_source();
                        let source = String::from(req.mut_context().get_request_source());
-                       let resp = future_get2(storage, req)
+                       if grpc_exeucte_request {
+                            let resp = future_get2(storage, req)
                             .map_ok(oneof!(batch_commands_response::response::Cmd::Get))
                             .map_err(|_| GRPC_MSG_FAIL_COUNTER.kv_get.inc());
-                        response_batch_commands_request(id, resp, tx.clone(), begin_instant, GrpcTypeKind::kv_get, source);
+                            response_batch_commands_request(id, resp, tx.clone(), begin_instant, GrpcTypeKind::kv_get, source);
+                       } else {
+                            let resp = future_get(storage, req)
+                            .map_ok(oneof!(batch_commands_response::response::Cmd::Get))
+                            .map_err(|_| GRPC_MSG_FAIL_COUNTER.kv_get.inc());
+                            response_batch_commands_request(id, resp, tx.clone(), begin_instant, GrpcTypeKind::kv_get, source);
+                       }                        
                     }
                 },
                 Some(batch_commands_request::request::Cmd::RawGet(mut req)) => {
@@ -1592,11 +1607,11 @@ fn future_get2<E: Engine, L: LockManager, F: KvFormat>(
         Key::from_raw(req.get_key()),
         req.get_version().into(),
     );
-    /*
+    
     if request_source.contains("external_") {
         info!("thd_name {:?} future_get2 after storage.get2 {:?}",std::thread::current().name(), req);
     }
-    */
+    
     async move {
         /*
         if request_source.contains("external_") {

@@ -180,6 +180,9 @@ pub struct Config {
     #[doc(hidden)]
     pub simplify_metrics: bool,
 
+    #[online_config(skip)]
+    pub gprc_execute_small_request: bool,
+
     // Server labels to specify some attributes about this server.
     #[online_config(skip)]
     pub labels: HashMap<String, String>,
@@ -261,6 +264,7 @@ impl Default for Config {
             // Go tikv client uses 4 as well.
             forward_max_connections_per_address: 4,
             simplify_metrics: false,
+            gprc_execute_small_request: false,
         }
     }
 }
