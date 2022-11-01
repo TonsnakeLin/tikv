@@ -1169,6 +1169,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                         pipelined,
                         is_async_apply_prewrite,
                         tag,
+                        cache_updates,
                     );
                     KV_COMMAND_KEYWRITE_HISTOGRAM_VEC
                         .get(tag)

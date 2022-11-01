@@ -8,7 +8,7 @@ use engine_traits::{CF_DEFAULT, CF_LOCK, CF_WRITE};
 use txn_types::{Key, Lock, PessimisticLock, TimeStamp, Value};
 
 use super::metrics::{GC_DELETE_VERSIONS_HISTOGRAM, MVCC_VERSIONS_HISTOGRAM};
-use crate::storage::kv::Modify;
+use crate::storage::{kv::Modify, txn::commands::CacheUpdate};
 
 pub const MAX_TXN_WRITE_SIZE: usize = 32 * 1024;
 

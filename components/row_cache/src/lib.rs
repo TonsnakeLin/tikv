@@ -11,12 +11,6 @@ pub struct RowCache {
     rows: Cache<Key, Row, FxBuildHasher>,
 }
 
-pub static ROW_CACHE: LazyLock<RowCache> = LazyLock::new(|| RowCache::default());
-
-pub struct RowCache {
-    rows: Cache<Key, Row, FxBuildHasher>,
-}
-
 impl Default for RowCache {
     fn default() -> Self {
         Self {

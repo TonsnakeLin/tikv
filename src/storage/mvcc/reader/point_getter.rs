@@ -6,6 +6,7 @@ use std::borrow::Cow;
 use engine_traits::{CF_DEFAULT, CF_LOCK, CF_WRITE};
 use kvproto::kvrpcpb::{IsolationLevel, WriteConflictReason};
 use txn_types::{Key, Lock, LockType, TimeStamp, TsSet, Value, WriteRef, WriteType};
+use row_cache::ROW_CACHE;
 
 use crate::storage::{
     kv::{Cursor, CursorBuilder, ScanMode, Snapshot, Statistics},
