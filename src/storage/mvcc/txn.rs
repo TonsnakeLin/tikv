@@ -71,6 +71,8 @@ pub struct MvccTxn {
     // reading requests should be able to read the locks from the engine.
     // So these guards can be released after finishing writing.
     pub(crate) guards: Vec<KeyHandleGuard>,
+
+    pub(crate) cache_updates: Vec<CacheUpdate>,
 }
 
 impl MvccTxn {
@@ -84,6 +86,7 @@ impl MvccTxn {
             locks_for_1pc: Vec::new(),
             concurrency_manager,
             guards: vec![],
+            cache_updates: vec![],
         }
     }
 

@@ -21,6 +21,7 @@ use crate::storage::{
     },
     ProcessResult, Snapshot,
 };
+use std::mem;
 
 command! {
     /// Resolve locks according to `txn_status`.
@@ -146,6 +147,7 @@ impl<S: Snapshot, L: LockManager> WriteCommand<S, L> for ResolveLock {
                 cmd: Command::ResolveLockReadPhase(next_cmd),
             }
         };
+        let cache_updates = mem::take(&mut txn.cache_updates);
         let mut write_data = WriteData::from_modifies(txn.into_modifies());
         write_data.set_allowed_on_disk_almost_full();
         Ok(WriteResult {
@@ -156,6 +158,7 @@ impl<S: Snapshot, L: LockManager> WriteCommand<S, L> for ResolveLock {
             lock_info: None,
             lock_guards: vec![],
             response_policy: ResponsePolicy::OnApplied,
+            cache_updates,
         })
     }
 }

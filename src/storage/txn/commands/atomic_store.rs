@@ -61,6 +61,7 @@ impl<S: Snapshot, L: LockManager> WriteCommand<S, L> for RawAtomicStore {
             lock_info: None,
             lock_guards: raw_ext.into_iter().map(|r| r.key_guard).collect(),
             response_policy: ResponsePolicy::OnApplied,
+            cache_updates: vec![],
         })
     }
 }

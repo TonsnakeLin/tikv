@@ -24,6 +24,7 @@
 //! which is transparent to the scheduler.
 
 use std::{
+    borrow::Cow,
     marker::PhantomData,
     mem,
     sync::{
@@ -48,6 +49,7 @@ use parking_lot::{Mutex, MutexGuard, RwLockWriteGuard};
 use pd_client::{Feature, FeatureGate};
 use raftstore::store::TxnExt;
 use resource_metering::{FutureExt, ResourceTagFactory};
+use row_cache::ROW_CACHE;
 use tikv_kv::{Modify, Snapshot, SnapshotExt, WriteData};
 use tikv_util::{
     deadline::Deadline, quota_limiter::QuotaLimiter, time::Instant, timer::GLOBAL_TIMER_HANDLE,
@@ -55,6 +57,7 @@ use tikv_util::{
 use tracker::{get_tls_tracker_token, set_tls_tracker_token, TrackerToken};
 use txn_types::TimeStamp;
 
+use super::commands::CacheUpdate;
 use crate::{
     server::lock_manager::waiter_manager,
     storage::{
@@ -675,6 +678,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
         pipelined: bool,
         async_apply_prewrite: bool,
         tag: CommandKind,
+        cache_updates: Vec<CacheUpdate>,
     ) {
         // TODO: Does async apply prewrite worth a special metric here?
         if pipelined {
@@ -689,6 +693,10 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                 .inc();
         } else {
             SCHED_STAGE_COUNTER_VEC.get(tag).write_finish.inc();
+        }
+
+        for update in cache_updates {
+            ROW_CACHE.insert(update.key, update.commit_ts, Cow::Owned(update.value));
         }
 
         debug!("write command finished";
@@ -918,6 +926,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
             lock_info,
             lock_guards,
             response_policy,
+            cache_updates,
         } = match deadline
             .check()
             .map_err(StorageError::from)
@@ -956,7 +965,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
 
         let mut pr = Some(pr);
         if to_be_write.modifies.is_empty() {
-            scheduler.on_write_finished(cid, pr, Ok(()), lock_guards, false, false, tag);
+            scheduler.on_write_finished(cid, pr, Ok(()), lock_guards, false, false, tag, cache_updates);
             return;
         }
 
@@ -976,7 +985,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                     engine.schedule_txn_extra(to_be_write.extra);
                 })
             }
-            scheduler.on_write_finished(cid, pr, Ok(()), lock_guards, false, false, tag);
+            scheduler.on_write_finished(cid, pr, Ok(()), lock_guards, false, false, tag, cache_updates);
             return;
         }
 
