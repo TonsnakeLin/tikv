@@ -21,7 +21,6 @@ use crate::storage::{
     },
     ProcessResult, Snapshot,
 };
-use std::mem;
 
 command! {
     /// Resolve locks according to `txn_status`.

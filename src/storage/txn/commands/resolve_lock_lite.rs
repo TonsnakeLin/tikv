@@ -17,7 +17,6 @@ use crate::storage::{
     },
     ProcessResult, Snapshot,
 };
-use std::mem;
 
 command! {
     /// Resolve locks on `resolve_keys` according to `start_ts` and `commit_ts`.

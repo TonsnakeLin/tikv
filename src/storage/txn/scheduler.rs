@@ -24,7 +24,6 @@
 //! which is transparent to the scheduler.
 
 use std::{
-    borrow::Cow,
     marker::PhantomData,
     mem,
     sync::{
@@ -49,7 +48,6 @@ use parking_lot::{Mutex, MutexGuard, RwLockWriteGuard};
 use pd_client::{Feature, FeatureGate};
 use raftstore::store::TxnExt;
 use resource_metering::{FutureExt, ResourceTagFactory};
-use row_cache::ROW_CACHE;
 use tikv_kv::{Modify, Snapshot, SnapshotExt, WriteData};
 use tikv_util::{
     deadline::Deadline, quota_limiter::QuotaLimiter, time::Instant, timer::GLOBAL_TIMER_HANDLE,
@@ -57,7 +55,6 @@ use tikv_util::{
 use tracker::{get_tls_tracker_token, set_tls_tracker_token, TrackerToken};
 use txn_types::TimeStamp;
 
-use super::commands::CacheUpdate;
 use crate::{
     server::lock_manager::waiter_manager,
     storage::{

@@ -17,8 +17,6 @@ use crate::storage::{
     ProcessResult, Snapshot, TxnStatus,
 };
 
-use std::mem;
-
 command! {
     /// Commit the transaction that started at `lock_ts`.
     ///
