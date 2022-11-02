@@ -8,7 +8,6 @@ use crate::storage::{
         metrics::{MVCC_CONFLICT_COUNTER, MVCC_DUPLICATE_CMD_COUNTER_VEC},
         ErrorInner, LockType, MvccTxn, ReleasedLock, Result as MvccResult, SnapshotReader,
     },
-    txn::commands::CacheUpdate,
     Snapshot,
 };
 
@@ -89,24 +88,6 @@ pub fn commit<S: Snapshot>(
         }
     };
 
-    if let LockType::Put | LockType::Delete = lock.lock_type {
-        let value = if lock.lock_type == LockType::Put && lock.short_value.is_none() {
-            let default_key = key.clone().append_ts(lock.ts);
-            reader
-                .snapshot()
-                .get(&default_key)
-                .unwrap()
-                .unwrap_or(vec![])
-        } else {
-            lock.short_value.clone().unwrap_or(vec![])
-        };
-        txn.cache_updates.push(CacheUpdate {
-            key: key.clone(),
-            commit_ts,
-            value,
-        });
-    }
-    
     let mut write = Write::new(
         WriteType::from_lock_type(lock.lock_type).unwrap(),
         reader.start_ts,

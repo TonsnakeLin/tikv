@@ -1533,7 +1533,7 @@ fn future_get<E: Engine, L: LockManager, F: KvFormat>(
     storage: &Storage<E, L, F>,
     mut req: GetRequest,
 ) -> impl Future<Output = ServerResult<GetResponse>> {
-    info!("future_get begin to future_get");
+    // info!("future_get begin to future_get");
     let tracker = GLOBAL_TRACKERS.insert(Tracker::new(RequestInfo::new(
         req.get_context(),
         RequestType::KvGet,
@@ -1608,9 +1608,11 @@ fn future_get2<E: Engine, L: LockManager, F: KvFormat>(
         req.get_version().into(),
     );
     
+    /*
     if request_source.contains("external_") {
         info!("thd_name {:?} future_get2 after storage.get2 {:?}",std::thread::current().name(), req);
     }
+    */
     
     async move {
         /*

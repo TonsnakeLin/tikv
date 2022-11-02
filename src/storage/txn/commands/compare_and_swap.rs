@@ -105,7 +105,6 @@ impl<S: Snapshot, L: LockManager> WriteCommand<S, L> for RawCompareAndSwap {
         };
         fail_point!("txn_commands_compare_and_swap");
         let rows = data.len();
-        let mut to_be_write = WriteData::from_modifies(data);
         to_be_write.set_allowed_on_disk_almost_full();
         Ok(WriteResult {
             ctx,
@@ -115,7 +114,6 @@ impl<S: Snapshot, L: LockManager> WriteCommand<S, L> for RawCompareAndSwap {
             lock_info: None,
             lock_guards,
             response_policy: ResponsePolicy::OnApplied,
-            cache_updates: vec![],
         })
     }
 }

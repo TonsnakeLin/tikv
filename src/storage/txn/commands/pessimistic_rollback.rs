@@ -94,7 +94,6 @@ impl<S: Snapshot, L: LockManager> WriteCommand<S, L> for PessimisticRollback {
             lock_info: None,
             lock_guards: vec![],
             response_policy: ResponsePolicy::OnApplied,
-            cache_updates: vec![],
         })
     }
 }

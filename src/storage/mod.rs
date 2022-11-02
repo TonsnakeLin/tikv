@@ -130,9 +130,6 @@ use crate::{
     },
 };
 
-use futures::{future::Either, prelude::*};
-use row_cache::ROW_CACHE;
-
 pub type Result<T> = std::result::Result<T, Error>;
 pub type Callback<T> = Box<dyn FnOnce(Result<T>) + Send>;
 
@@ -589,12 +586,6 @@ impl<E: Engine, L: LockManager, F: KvFormat> Storage<E, L, F> {
         start_ts: TimeStamp,
     ) -> impl Future<Output = Result<(Option<Value>, KvGetStatistics)>> {
 
-        if start_ts.is_max() {
-            if let Some(row) = ROW_CACHE.get(&key) {
-                return Either::Left(async move { Ok((Some(row.value), Default::default())) });
-            }
-        }
-
         let stage_begin_ts = Instant::now();
         const CMD: CommandKind = CommandKind::get;
         let priority = ctx.get_priority();
@@ -732,10 +723,10 @@ impl<E: Engine, L: LockManager, F: KvFormat> Storage<E, L, F> {
             priority,
             thread_rng().next_u64(),
         );
-        Either::Right(async move {
+        async move {
             res.map_err(|_| Error::from(ErrorInner::SchedTooBusy))
                 .await?
-        })
+        }
     }
 
     pub fn get2(
@@ -744,11 +735,6 @@ impl<E: Engine, L: LockManager, F: KvFormat> Storage<E, L, F> {
         key: Key,
         start_ts: TimeStamp,
     ) -> impl Future<Output = Result<(Option<Value>, KvGetStatistics)>> {
-        if start_ts.is_max() {
-            if let Some(row) = ROW_CACHE.get(&key) {
-                return Either::Left(async move { Ok((Some(row.value), Default::default())) });
-            }
-        }
         let stage_begin_ts = Instant::now();
         const CMD: CommandKind = CommandKind::get;
         let priority = ctx.get_priority();
@@ -898,9 +884,9 @@ impl<E: Engine, L: LockManager, F: KvFormat> Storage<E, L, F> {
                 }
             };
         
-        Either::Right(async move {
+        async move {
             res.await?
-        })
+        }
     }  
 
     pub fn sync_get(

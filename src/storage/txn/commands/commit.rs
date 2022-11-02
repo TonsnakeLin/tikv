@@ -70,7 +70,6 @@ impl<S: Snapshot, L: LockManager> WriteCommand<S, L> for Commit {
         let pr = ProcessResult::TxnStatus {
             txn_status: TxnStatus::committed(self.commit_ts),
         };
-        let cache_updates = mem::take(&mut txn.cache_updates);
         let mut write_data = WriteData::from_modifies(txn.into_modifies());
         write_data.set_allowed_on_disk_almost_full();
         Ok(WriteResult {
@@ -81,7 +80,6 @@ impl<S: Snapshot, L: LockManager> WriteCommand<S, L> for Commit {
             lock_info: None,
             lock_guards: vec![],
             response_policy: ResponsePolicy::OnApplied,
-            cache_updates,
         })
     }
 }

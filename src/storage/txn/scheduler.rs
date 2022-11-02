@@ -678,7 +678,6 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
         pipelined: bool,
         async_apply_prewrite: bool,
         tag: CommandKind,
-        cache_updates: Vec<CacheUpdate>,
     ) {
         // TODO: Does async apply prewrite worth a special metric here?
         if pipelined {
@@ -693,10 +692,6 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                 .inc();
         } else {
             SCHED_STAGE_COUNTER_VEC.get(tag).write_finish.inc();
-        }
-
-        for update in cache_updates {
-            ROW_CACHE.insert(update.key, update.commit_ts, Cow::Owned(update.value));
         }
 
         debug!("write command finished";
@@ -926,7 +921,6 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
             lock_info,
             lock_guards,
             response_policy,
-            cache_updates,
         } = match deadline
             .check()
             .map_err(StorageError::from)
@@ -965,7 +959,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
 
         let mut pr = Some(pr);
         if to_be_write.modifies.is_empty() {
-            scheduler.on_write_finished(cid, pr, Ok(()), lock_guards, false, false, tag, cache_updates);
+            scheduler.on_write_finished(cid, pr, Ok(()), lock_guards, false, false, tag);
             return;
         }
 
@@ -985,7 +979,7 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                     engine.schedule_txn_extra(to_be_write.extra);
                 })
             }
-            scheduler.on_write_finished(cid, pr, Ok(()), lock_guards, false, false, tag, cache_updates);
+            scheduler.on_write_finished(cid, pr, Ok(()), lock_guards, false, false, tag);
             return;
         }
 
@@ -1169,7 +1163,6 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
                         pipelined,
                         is_async_apply_prewrite,
                         tag,
-                        cache_updates,
                     );
                     KV_COMMAND_KEYWRITE_HISTOGRAM_VEC
                         .get(tag)
