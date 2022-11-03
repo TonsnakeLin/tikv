@@ -13,7 +13,7 @@
 #![feature(specialization)]
 #![feature(const_mut_refs)]
 
-#[macro_use(box_try, warn, info)]
+#[macro_use(box_try, warn)]
 extern crate tikv_util;
 
 #[macro_use(other_err)]

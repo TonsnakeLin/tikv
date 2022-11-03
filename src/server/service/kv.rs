@@ -1593,7 +1593,7 @@ fn future_get2<E: Engine, L: LockManager, F: KvFormat>(
     storage: &Storage<E, L, F>,
     mut req: GetRequest,
 ) -> impl Future<Output = ServerResult<GetResponse>> {
-    let request_source = String::from(req.mut_context().get_request_source());
+    // let request_source = String::from(req.mut_context().get_request_source());
     let tracker = GLOBAL_TRACKERS.insert(Tracker::new(RequestInfo::new(
         req.get_context(),
         RequestType::KvGet,

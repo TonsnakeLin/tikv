@@ -739,10 +739,12 @@ impl<E: Engine, L: LockManager, F: KvFormat> Storage<E, L, F> {
         const CMD: CommandKind = CommandKind::get;
         let priority = ctx.get_priority();
         let priority_tag = get_priority_tag(priority);
+        /*
         let resource_tag = self.resource_tag_factory.new_tag_with_key_ranges(
             &ctx,
             vec![(key.as_encoded().to_vec(), key.as_encoded().to_vec())],
         );
+        */
         let concurrency_manager = self.concurrency_manager.clone();
         let api_version = self.api_version;
 
@@ -899,10 +901,12 @@ impl<E: Engine, L: LockManager, F: KvFormat> Storage<E, L, F> {
         const CMD: CommandKind = CommandKind::get;
         let priority = ctx.get_priority();
         let priority_tag = get_priority_tag(priority);
+        /*
         let resource_tag = self.resource_tag_factory.new_tag_with_key_ranges(
             &ctx,
             vec![(key.as_encoded().to_vec(), key.as_encoded().to_vec())],
         );
+        */
         let concurrency_manager = self.concurrency_manager.clone();
         let api_version = self.api_version;
 
