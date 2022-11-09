@@ -1208,19 +1208,6 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-epoch"
-version = "0.9.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f916dfc5d356b0ed9dae65f1db9fc9770aa2851d2662b988ccf4fe3516e86348"
-dependencies = [
- "autocfg",
- "cfg-if 1.0.0",
- "crossbeam-utils 0.8.8",
- "memoffset",
- "scopeguard",
-]
-
-[[package]]
-name = "crossbeam-epoch"
 version = "0.9.10"
 source = "git+https://github.com/crossbeam-rs/crossbeam?rev=41ed3d948720f26149b2ebeaf58fe8a193134056#41ed3d948720f26149b2ebeaf58fe8a193134056"
 dependencies = [
@@ -1229,6 +1216,19 @@ dependencies = [
  "crossbeam-utils 0.8.11",
  "memoffset",
  "once_cell",
+ "scopeguard",
+]
+
+[[package]]
+name = "crossbeam-epoch"
+version = "0.9.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f916dfc5d356b0ed9dae65f1db9fc9770aa2851d2662b988ccf4fe3516e86348"
+dependencies = [
+ "autocfg",
+ "cfg-if 1.0.0",
+ "crossbeam-utils 0.8.8",
+ "memoffset",
  "scopeguard",
 ]
 
@@ -1362,9 +1362,9 @@ dependencies = [
 
 [[package]]
 name = "dashmap"
-version = "5.2.0"
+version = "5.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c8858831f7781322e539ea39e72449c46b059638250c14344fec8d0aa6e539c"
+checksum = "907076dfda823b0b36d2a1bb5f90c96660a5bbcd7729e10727f07858f22c4edc"
 dependencies = [
  "cfg-if 1.0.0",
  "hashbrown 0.12.3",
@@ -2732,7 +2732,7 @@ dependencies = [
 [[package]]
 name = "kvproto"
 version = "0.0.2"
-source = "git+https://github.com/pingcap/kvproto.git#65d0ae8fa853c1e41b43f329afbf60616bdd4d18"
+source = "git+https://github.com/TonsnakeLin/kvproto?branch=get_return_chunk#4798cac357400088c074a0c204fbbe8b210d7623"
 dependencies = [
  "futures 0.3.15",
  "grpcio",
@@ -7127,6 +7127,9 @@ name = "uuid"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "feb41e78f93363bb2df8b0e86a2ca30eed7806ea16ea0c790d757cf93f79be83"
+dependencies = [
+ "getrandom 0.2.3",
+]
 
 [[package]]
 name = "valgrind_request"
