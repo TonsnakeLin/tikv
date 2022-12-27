@@ -425,6 +425,11 @@ where
 
         let mut req = Request::default();
         req.set_cmd_type(CmdType::Snap);
+        if ctx.pb_ctx.get_request_source().contains("external_") {
+            info!("RaftKv::async_snapshot";
+            "key_ranges empty" => ctx.key_ranges.is_empty(),
+            "start_ts" => ctx.start_ts);
+        }
         if !ctx.key_ranges.is_empty() && !ctx.start_ts.is_zero() {
             req.mut_read_index().set_start_ts(ctx.start_ts.into_inner());
             req.mut_read_index()
