@@ -188,6 +188,9 @@ where
         }
         header.set_sync_log(ctx.get_sync_log());
         header.set_replica_read(ctx.get_replica_read());
+        if ctx.get_request_source().contains("external_") {
+            header.set_print_info(true);
+        }
         header
     }
 
@@ -209,6 +212,9 @@ where
         let mut cmd = RaftCmdRequest::default();
         cmd.set_header(header);
         cmd.set_requests(vec![req].into());
+        if cmd.get_header().get_print_info() {
+            info!("RaftKV::exec_snapshot print_info is true")
+        }
         self.router
             .read(
                 ctx.read_id,
