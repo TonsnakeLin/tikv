@@ -484,6 +484,10 @@ where
 
     fn redirect(&mut self, mut cmd: RaftCommand<E::Snapshot>) {
         debug!("localreader redirects command"; "command" => ?cmd);
+        let ref_cmd = &cmd;
+        if ref_cmd.request.get_header().get_print_info() {
+            info!("redirect local read to propose")
+        }
         let region_id = cmd.request.get_header().get_region_id();
         let mut err = errorpb::Error::default();
         match ProposalRouter::send(&self.router, cmd) {
@@ -646,6 +650,9 @@ where
                             // Forward to raftstore.
                             self.redirect(RaftCommand::new(req, cb));
                             return;
+                        }
+                        if req.get_header().get_print_info() {
+                            info!("LocalReader::ReadLocal")
                         }
                         let response = self.execute(&req, &delegate.region, None, read_id);
                         // Try renew lease in advance
