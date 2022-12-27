@@ -575,6 +575,9 @@ impl<E: Engine, L: LockManager, F: KvFormat> Storage<E, L, F> {
         key: Key,
         start_ts: TimeStamp,
     ) -> impl Future<Output = Result<(Option<Value>, KvGetStatistics)>> {
+        if ctx.get_request_source().contains("external_") {
+            info!("thd_name {:?}, Storage::get, enter function", std::thread::current().name());
+        }
         let stage_begin_ts = Instant::now();
         const CMD: CommandKind = CommandKind::get;
         let priority = ctx.get_priority();

@@ -430,6 +430,11 @@ where
             req.mut_read_index()
                 .set_key_ranges(mem::take(&mut ctx.key_ranges).into());
         }
+        if ctx.get_request_source().contains("external_") {
+            info!("async_snapshot";
+            "raftcmd req" => req);
+        }
+        
         ASYNC_REQUESTS_COUNTER_VEC.snapshot.all.inc();
         let begin_instant = Instant::now_coarse();
         self.exec_snapshot(
