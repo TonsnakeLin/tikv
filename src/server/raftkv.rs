@@ -429,10 +429,14 @@ where
             req.mut_read_index().set_start_ts(ctx.start_ts.into_inner());
             req.mut_read_index()
                 .set_key_ranges(mem::take(&mut ctx.key_ranges).into());
+            if ctx.pb_ctx.get_request_source().contains("external_") {
+                info!("RaftKv::async_snapshot, request has read_index");
+            }
         }
-        if ctx.get_request_source().contains("external_") {
+        if ctx.pb_ctx.get_request_source().contains("external_") {
             info!("async_snapshot";
-            "raftcmd req" => req);
+            "raftcmd req" => ?req);
+            // info!("RaftKv::async_snapshot, request {:?}", req);
         }
         
         ASYNC_REQUESTS_COUNTER_VEC.snapshot.all.inc();
