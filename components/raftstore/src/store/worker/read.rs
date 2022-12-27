@@ -26,6 +26,7 @@ use tikv_util::{
     debug, error,
     lru::LruCache,
     time::{monotonic_raw_now, Instant, ThreadReadId},
+    info,
 };
 use time::Timespec;
 
