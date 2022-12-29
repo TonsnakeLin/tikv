@@ -850,11 +850,17 @@ where
         &mut self,
         ready: &mut Ready,
         destroy_regions: Vec<metapb::Region>,
+        print_info: bool,
     ) -> Result<(HandleReadyResult, WriteTask<EK, ER>)> {
+        if print_info {
+            info!("handle_raft_ready...";
+            "ready" => ?ready);
+        }
         let region_id = self.get_region_id();
         let prev_raft_state = self.raft_state().clone();
 
         let mut write_task = WriteTask::new(region_id, self.peer_id, ready.number());
+        write_task.print_info = print_info;
 
         let mut res = HandleReadyResult::SendIoTask;
         if !ready.snapshot().is_empty() {
@@ -873,6 +879,9 @@ where
         };
 
         if !ready.entries().is_empty() {
+            if print_info {
+                info!("handle_raft_ready, begin to append entry to write task");
+            }
             self.append(ready.take_entries(), &mut write_task);
         }
 

@@ -2604,6 +2604,11 @@ where
 
         let state_role = ready.ss().map(|ss| ss.raft_state);
         let has_new_entries = !ready.entries().is_empty();
+        if ctx.print_info { 
+            info!("handle_raft_ready_append";
+            "state_role" => ?state_role,
+            "has_new_entries" => ?has_new_entries);
+        }
         let mut trackers = vec![];
         if ctx.raft_metrics.waterfall_metrics {
             let now = Instant::now();
@@ -2622,7 +2627,7 @@ where
         }
         let (res, mut task) = match self
             .mut_store()
-            .handle_raft_ready(&mut ready, destroy_regions)
+            .handle_raft_ready(&mut ready, destroy_regions, ctx.print_info)
         {
             Ok(r) => r,
             Err(e) => {
@@ -2633,7 +2638,7 @@ where
         };
 
         if ctx.print_info {
-            info!("func_name [Peer::handle_raft_ready_append], HandleReadyRes {:?}", res);	
+            info!("Peer::handle_raft_ready_append, HandleReadyRes {:?}", res);	
         }
 
         let ready_number = ready.number();

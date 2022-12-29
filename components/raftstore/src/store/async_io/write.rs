@@ -171,6 +171,7 @@ where
     pub extra_write: ExtraWrite<EK::WriteBatch>,
     pub messages: Vec<RaftMessage>,
     pub trackers: Vec<TimeTracker>,
+    pub print_info: bool,
 }
 
 impl<EK, ER> WriteTask<EK, ER>
@@ -191,6 +192,7 @@ where
             extra_write: ExtraWrite::None,
             messages: vec![],
             trackers: vec![],
+            print_info: false,
         }
     }
 
@@ -380,6 +382,9 @@ where
 
     /// Add write task to this batch
     fn add_write_task(&mut self, mut task: WriteTask<EK, ER>) {
+        if task.print_info {
+            info!("add write task to batch, which is in memory");
+        }
         if let Err(e) = task.valid() {
             panic!("task is not valid: {:?}", e);
         }
