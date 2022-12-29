@@ -2777,6 +2777,10 @@ where
         if committed_entries.is_empty() {
             return;
         }
+        if ctx.print_info {
+            info!("handle_raft_committed_entries";
+            "committed_entries" => ?committed_entries);
+        }
         fail_point!(
             "before_leader_handle_committed_entries",
             self.is_leader(),
@@ -3278,7 +3282,7 @@ where
             }
             if ctx.print_info { 
                 info!("apply_reads..., self is leader";
-                "propose_time" => propose_time,);
+                "propose_time" => ?propose_time,);
             }
         }
 
