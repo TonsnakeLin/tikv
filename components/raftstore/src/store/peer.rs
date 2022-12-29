@@ -2061,6 +2061,9 @@ where
 
     fn on_role_changed<T>(&mut self, ctx: &mut PollContext<EK, ER, T>, ready: &Ready) {
         // Update leader lease when the Raft state changes.
+        if ctx.print_info {
+            info!("on_role_changed ......");
+        }
         if let Some(ss) = ready.ss() {
             match ss.raft_state {
                 StateRole::Leader => {
@@ -2418,7 +2421,7 @@ where
         ctx: &mut PollContext<EK, ER, T>,
     ) -> Option<ReadyResult> {
         if ctx.print_info {
-            info!("the_name {:?}, func_name [peer::handle_raft_ready_append]", 
+            info!("thd_name {:?}, peer::handle_raft_ready_append...", 
                 thread::current().name());
         }
         if self.pending_remove {
@@ -2484,7 +2487,7 @@ where
         if !self.raft_group.has_ready() {
             fail_point!("before_no_ready_gen_snap_task", |_| None);
             if ctx.print_info {
-                info!("the_name {:?}, func_name [Peer::handle_raft_ready_append], raft_group has no readiness", 
+                info!("thd_name {:?}, raft_group has no readiness", 
                 thread::current().name());
             }
             // Generating snapshot task won't set ready for raft group.
@@ -2525,7 +2528,7 @@ where
 
         let mut ready = self.raft_group.ready();
         if ctx.print_info {
-            info!("the_name {:?}, the ready is {:?}", 
+            info!("thd_name {:?}, the ready is {:?}", 
             thread::current().name(), ready); 
         }
 
@@ -2555,6 +2558,9 @@ where
         self.on_role_changed(ctx, &ready);
 
         if let Some(hs) = ready.hs() {
+            if ctx.print_info {
+                info!("ready has hardstate");
+            }
             let pre_commit_index = self.get_store().commit_index();
             assert!(hs.get_commit() >= pre_commit_index);
             if self.is_leader() {
@@ -2576,7 +2582,7 @@ where
 
         if !ready.committed_entries().is_empty() {
             if ctx.print_info { 
-                info!("thd_name {:?} func_name [Peer::handle_raft_ready_append], ready has committed entries", 
+                info!("thd_name {:?} Peer::handle_raft_ready_append, ready has committed entries", 
                 thread::current().name());
             }
             self.handle_raft_committed_entries(ctx, ready.take_committed_entries());
@@ -3254,6 +3260,9 @@ where
         // update the `read_index` of read request that before this successful
         // `ready`.
         if !self.is_leader() {
+            if ctx.print_info { 
+                info!("apply_reads..., self is not leader");
+            }
             // NOTE: there could still be some pending reads proposed by the peer when it
             // was leader. They will be cleared in `clear_uncommitted_on_role_change` later
             // in the function.
@@ -3267,11 +3276,18 @@ where
                     self.response_read(&mut read, ctx, false);
                 }
             }
+            if ctx.print_info { 
+                info!("apply_reads..., self is leader";
+                "propose_time" => propose_time,);
+            }
         }
 
         // Note that only after handle read_states can we identify what requests are
         // actually stale.
         if ready.ss().is_some() {
+            if ctx.print_info { 
+                info!("ready has softstate");
+            }
             let term = self.term();
             // all uncommitted reads will be dropped silently in raft.
             self.pending_reads.clear_uncommitted_on_role_change(term);
@@ -3280,6 +3296,9 @@ where
         if let Some(propose_time) = propose_time {
             if self.leader_lease.is_suspect() {
                 return;
+            }
+            if ctx.print_info { 
+                info!("will renew leader lease");
             }
             self.maybe_renew_leader_lease(propose_time, ctx, None);
         }

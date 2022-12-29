@@ -158,6 +158,10 @@ where
         true
     }
 
+    pub fn request_len(&self) -> usize {
+        self.reads.len()
+    }
+
     pub fn has_unresolved(&self) -> bool {
         self.ready_cnt != self.reads.len()
     }
