@@ -3087,6 +3087,16 @@ where
         self.report_commit_log_duration(pre_commit_index, &ctx.raft_metrics);
 
         let persist_index = self.raft_group.raft.raft_log.persisted;
+
+        if ctx.print_info {
+            info!("handle_raft_ready_advance";
+            "pre_persist_index" => pre_persist_index,
+            "pre_commit_index" => pre_commit_index,
+            "persist_index" => persist_index,
+            "force_leader" => self.force_leader,
+            "light_rd" => ?light_rd);
+        }
+
         if let Some(ForceLeaderState::ForceLeader { .. }) = self.force_leader {
             // forward commit index, the committed entries will be applied in the next raft
             // base tick round
@@ -3270,7 +3280,9 @@ where
         // `ready`.
         if !self.is_leader() {
             if ctx.print_info { 
-                info!("apply_reads..., self is not leader");
+                info!("apply_reads..., self is not leader";
+                "pending_reads_len" => self.pending_reads.request_len(),
+                "propose_time" => ?propose_time,);
             }
             // NOTE: there could still be some pending reads proposed by the peer when it
             // was leader. They will be cleared in `clear_uncommitted_on_role_change` later
@@ -3287,6 +3299,7 @@ where
             }
             if ctx.print_info { 
                 info!("apply_reads..., self is leader";
+                "pending_reads_len" => self.pending_reads.request_len(),
                 "propose_time" => ?propose_time,);
             }
         }

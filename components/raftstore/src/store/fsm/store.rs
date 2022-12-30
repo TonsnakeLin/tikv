@@ -985,7 +985,7 @@ impl<EK: KvEngine, ER: RaftEngine, T: Transport> PollHandler<PeerFsm<EK, ER>, St
         let write_begin = TiInstant::now();
         if let Some(write_worker) = &mut self.poll_ctx.sync_write_worker {
             if self.poll_ctx.has_ready {
-                write_worker.write_to_db(false);
+                write_worker.write_to_db(false, print_info);
 
                 for mut inspector in latency_inspect {
                     inspector.record_store_write(write_begin.saturating_elapsed());
@@ -1009,6 +1009,9 @@ impl<EK: KvEngine, ER: RaftEngine, T: Transport> PollHandler<PeerFsm<EK, ER>, St
                 }
             }
         } else {
+            if print_info {
+                info!("RaftPoller::end, send latency inspecting to write workers");
+            }
             let writer_id = rand::random::<usize>() % self.poll_ctx.cfg.store_io_pool_size;
             if let Err(err) =
                 self.poll_ctx.write_senders[writer_id].try_send(WriteMsg::LatencyInspect {

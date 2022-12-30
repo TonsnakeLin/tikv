@@ -609,7 +609,7 @@ where
 
             STORE_WRITE_TRIGGER_SIZE_HISTOGRAM.observe(self.batch.get_raft_size() as f64);
 
-            self.write_to_db(true);
+            self.write_to_db(true, false);
 
             self.clear_latency_inspect();
 
@@ -653,9 +653,14 @@ where
         self.batch.add_write_task(task);
     }
 
-    pub fn write_to_db(&mut self, notify: bool) {
+    pub fn write_to_db(&mut self, notify: bool, print_info: bool) {
         if self.batch.is_empty() {
             return;
+        }
+
+        if print_info {
+            info!("thd_name {:?}, Worker::write_to_db ......", 
+            std::thread::current().name());
         }
 
         let timer = Instant::now();
@@ -664,9 +669,13 @@ where
 
         fail_point!("raft_before_save");
 
+
         let mut write_kv_time = 0f64;
         if let ExtraBatchWrite::V1(kv_wb) = &mut self.batch.extra_batch_write {
             if !kv_wb.is_empty() {
+                if print_info {
+                    info!("kv_wb is not empty, will write to kv db");
+                }
                 let store_id = self.store_id;
                 let raft_before_save_kv_on_store_3 = || {
                     fail_point!("raft_before_save_kv_on_store_3", store_id == 3, |_| {});
@@ -702,6 +711,10 @@ where
         let mut write_raft_time = 0f64;
         if !self.batch.raft_wb.is_empty() {
             fail_point!("raft_before_save_on_store_1", self.store_id == 1, |_| {});
+
+            if print_info {
+                info!("raft_wb is not empty, will write to raft db");
+            }
 
             let now = Instant::now();
             self.perf_context.start_observe();
@@ -753,6 +766,12 @@ where
                     "disk_usage" => ?msg.get_disk_usage(),
                 );
 
+                if print_info {
+                    info!("send raft msg in write thread";
+                        "thd_name" => std::thread::current().name(),
+                        "raft message" => msg);
+                }
+
                 if let Err(e) = self.trans.send(msg) {
                     // We use metrics to observe failure on production.
                     debug!(
@@ -777,6 +796,7 @@ where
             }
         }
         if self.trans.need_flush() {
+            info!("flush raft messages in write_to_db");
             self.trans.flush();
             self.message_metrics.flush();
         }
@@ -786,6 +806,7 @@ where
 
         let mut callback_time = 0f64;
         if notify {
+            info!("notify to persist");
             for (region_id, (peer_id, ready_number)) in &self.batch.readies {
                 self.notifier.notify(*region_id, *peer_id, *ready_number);
             }
