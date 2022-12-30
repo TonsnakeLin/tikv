@@ -769,7 +769,7 @@ where
                 if print_info {
                     info!("send raft msg in write thread";
                         "thd_name" => std::thread::current().name(),
-                        "raft message" => msg);
+                        "raft message" => ?msg);
                 }
 
                 if let Err(e) = self.trans.send(msg) {

@@ -3093,7 +3093,7 @@ where
             "pre_persist_index" => pre_persist_index,
             "pre_commit_index" => pre_commit_index,
             "persist_index" => persist_index,
-            "force_leader" => self.force_leader,
+            "force_leader" => ?self.force_leader,
             "light_rd" => ?light_rd);
         }
 
