@@ -796,7 +796,9 @@ where
             }
         }
         if self.trans.need_flush() {
-            info!("flush raft messages in write_to_db");
+            if print_info {
+                info!("flush raft messages in write_to_db");
+            }            
             self.trans.flush();
             self.message_metrics.flush();
         }
