@@ -262,7 +262,7 @@ impl Buffer for BatchMessageBuffer {
     #[inline]
     fn push(&mut self, msg: RaftMessage) {
         if msg.print_info {
-            info!("Queue::pop"; 
+            info!("BatchMessageBuffer::push"; 
             "thd_name" => ?std::thread::current().name(), 
             "msg" => ?msg,
             );

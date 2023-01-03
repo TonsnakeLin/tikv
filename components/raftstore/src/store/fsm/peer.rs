@@ -643,6 +643,7 @@ where
                         std::thread::current().name(), cmd);
                         self.print_info = true;
                         self.fsm.print_info = true;
+                        self.fsm.peer.print_info = true;
                         self.ctx.print_info = true;
                     }
                     self.ctx

@@ -889,6 +889,7 @@ where
     /// lead_transferee if the peer is in a leadership transferring.
     pub lead_transferee: u64,
     pub unsafe_recovery_state: Option<UnsafeRecoveryState>,
+    pub print_info: bool,
 }
 
 impl<EK, ER> Peer<EK, ER>
@@ -1020,6 +1021,7 @@ where
             last_region_buckets: None,
             lead_transferee: raft::INVALID_ID,
             unsafe_recovery_state: None,
+            print_info: false,
         };
 
         // If this region has only one peer and I am the one, campaign directly.
@@ -1087,6 +1089,10 @@ where
     /// Register self to apply_scheduler so that the peer is then usable.
     /// Also trigger `RegionChangeEvent::Create` here.
     pub fn activate<T>(&self, ctx: &PollContext<EK, ER, T>) {
+        if ctx.print_info {
+            info!("Peer::active Register self to apply_scheduler";
+            "thread_name" => ?std::thread::current().name());
+        }
         ctx.apply_router
             .schedule_task(self.region_id, ApplyTask::register(self));
 
@@ -2792,6 +2798,11 @@ where
             |_| ()
         );
 
+        if ctx.print_info {
+            info!("handle_raft_committed_entries";
+            "committed_entries" => ?committed_entries);
+        }
+
         assert!(
             !self.is_handling_snapshot(),
             "{} is applying snapshot when it is ready to handle committed entries",
@@ -2886,7 +2897,7 @@ where
                 self.mut_store().evict_entry_cache(false);
             }
             ctx.apply_router
-                .schedule_task(self.region_id, ApplyTask::apply(apply));
+                .schedule_task(self.region_id, ApplyTask::apply(apply, self.print_info));
         }
         fail_point!("after_send_to_apply_1003", self.peer_id() == 1003, |_| {});
     }
@@ -3100,6 +3111,9 @@ where
         if let Some(ForceLeaderState::ForceLeader { .. }) = self.force_leader {
             // forward commit index, the committed entries will be applied in the next raft
             // base tick round
+            if ctx.print_info {
+                info!("handle_raft_ready_advance..., will call maybe_force_forward_commit_index");
+            }
             self.maybe_force_forward_commit_index();
         }
         self.mut_store().update_cache_persisted(persist_index);
@@ -3113,6 +3127,9 @@ where
             // (i.e. commit of hardstate in PeerStorage) should be updated.
             self.mut_store().set_commit_index(commit_index);
             if self.is_leader() {
+                if ctx.print_info {
+                    info!("handle_raft_ready_advance..., will call on_leader_commit_idx_changed");
+                }
                 self.on_leader_commit_idx_changed(pre_commit_index, commit_index);
             }
         }
@@ -3121,8 +3138,13 @@ where
             if !self.is_leader() {
                 fail_point!("raft_before_follower_send");
             }
+
             let msgs = light_rd.take_messages();
             let m = self.build_raft_messages(ctx, msgs);
+            if ctx.print_info {
+                info!("handle_raft_ready_advance..., will send_raft_messages";
+                "messages" => ?m);
+            }
             self.send_raft_messages(ctx, m);
         }
 
