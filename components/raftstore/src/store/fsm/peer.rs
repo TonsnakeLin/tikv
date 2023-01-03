@@ -1285,7 +1285,7 @@ where
                         region_epoch,
                         cb,
                     },
-                    self.print_info
+                    self.print_info.clone()
                 )
             })),
             DiskFullOpt::NotAllowedOnFull,
