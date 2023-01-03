@@ -3274,7 +3274,10 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Msg::Apply { apply, .. } => write!(f, "[region {}] async apply", apply.region_id),
+            Msg::Apply { apply, .. } => {
+                write!(f, "[region {}] async apply, [peer {}], [term {}], [commit_index {}], [commit_term {}]", 
+                    apply.region_id, apply.peer_id, apply.term, apply.commit_index, apply.commit_term)
+            }
             Msg::Registration(ref r) => {
                 write!(f, "[region {}] Reg {:?}", r.region.get_id(), r.apply_state)
             }
@@ -4153,13 +4156,13 @@ where
     EK: KvEngine,
 {
     pub fn schedule_task(&self, region_id: u64, msg: Msg<EK>, print_info: bool) {
-        if print_info {
+        // if print_info {
             let bt = backtrace::Backtrace::new();        
             info!("ApplyRouter::schedule_task"; 
                 "backtrace" => ?bt,
                 "msg" => ?msg,
                 "thread_name" => ?std::thread::current().name());
-        }
+        // }
 
         let reg = match self.try_send(region_id, msg) {
             Either::Left(Ok(())) => return,
