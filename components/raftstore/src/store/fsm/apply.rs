@@ -3773,8 +3773,13 @@ where
                     }
 
                     if print_info {
-                        info!("thd_name {:?}, ApplyFsm::handle_tasks, {:?}", 
-                        std::thread::current().name(), msg);
+                        info!("ApplyFsm::handle_tasks"; 
+                        "thread_name" => std::thread::current().name(),
+                        "peer_id" => apply.peer_id,
+                        "region_id" => apply.region_id,
+                        "term" => apply.term,
+                        "commit_index" => apply.commit_index,
+                        "commit_term" => apply.commit_term);
                     }
 
                     if let Some(batch) = batch_apply.as_mut() {
