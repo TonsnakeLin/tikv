@@ -1285,6 +1285,7 @@ where
                         region_epoch,
                         cb,
                     },
+                    self.print_info
                 )
             })),
             DiskFullOpt::NotAllowedOnFull,
@@ -3227,7 +3228,9 @@ where
             // Destroy the apply fsm first, wait for the reply msg from apply fsm
             self.ctx
                 .apply_router
-                .schedule_task(job.region_id, ApplyTask::destroy(job.region_id, false));
+                .schedule_task(job.region_id, 
+                    ApplyTask::destroy(job.region_id, false),
+                    self.ctx.print_info);
             false
         } else {
             // Destroy the peer fsm directly
@@ -4219,6 +4222,7 @@ where
                 self.ctx.apply_router.schedule_task(
                     self.fsm.region_id(),
                     ApplyTask::LogsUpToDate(self.fsm.peer.catch_up_logs.take().unwrap()),
+                    self.ctx.print_info,
                 );
                 return;
             }
@@ -4253,7 +4257,9 @@ where
                 // then it will send `Noop` to trigger target apply fsm.
                 self.ctx
                     .apply_router
-                    .schedule_task(region_id, ApplyTask::LogsUpToDate(catch_up_logs));
+                    .schedule_task(region_id, 
+                        ApplyTask::LogsUpToDate(catch_up_logs),
+                        self.ctx.print_info);
                 return;
             }
         }
@@ -4493,6 +4499,7 @@ where
                 self.ctx.apply_router.schedule_task(
                     self.fsm.region_id(),
                     ApplyTask::destroy(self.fsm.region_id(), true),
+                    self.ctx.print_info,
                 );
             }
             MergeResultKind::FromTargetSnapshotStep2 => {
