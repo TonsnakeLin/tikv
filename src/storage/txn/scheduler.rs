@@ -675,8 +675,8 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
             info!("thd_name {:?} scheduler::on_write_finished, cid {:?}, async_apply_prewrite {:?}",
             std::thread::current().name(), cid, async_apply_prewrite);
 
-            let bt = backtrace::Backtrace::new();
-            info!("scheduler::on_write_finished"; "backtrace" => ?bt);
+            // let bt = backtrace::Backtrace::new();
+            // info!("scheduler::on_write_finished"; "backtrace" => ?bt);
         }        
     }
 
@@ -1115,6 +1115,9 @@ impl<E: Engine, L: LockManager> Scheduler<E, L> {
             if print_info {
                 info!("thd_name {:?}, calling engine_cb, command {:?}",
                 std::thread::current().name(), cid);
+
+                let bt = backtrace::Backtrace::new();
+                info!("scheduler::process_write"; "backtrace" => ?bt);
             }
             let ok = result.is_ok();
             if ok && !removed_pessimistic_locks.is_empty() {
