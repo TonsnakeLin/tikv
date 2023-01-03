@@ -629,7 +629,7 @@ where
         for m in msgs.drain(..) {
             match m {
                 PeerMsg::RaftMessage(msg) => {
-                    info!("thd_name {:?}, handle_msgs RaftMessage {:?}",  std::thread::current().name(), msg.msg);
+                    // info!("thd_name {:?}, handle_msgs RaftMessage {:?}",  std::thread::current().name(), msg.msg);
                     if let Err(e) = self.on_raft_message(msg) {
                         error!(%e;
                             "handle raft message err";
@@ -639,7 +639,7 @@ where
                     }
                 }
                 PeerMsg::RaftCommand(cmd) => {
-                    info!("thd_name {:?}, handle_msgs RaftCommand {:?}", std::thread::current().name(), cmd);
+                    // info!("thd_name {:?}, handle_msgs RaftCommand {:?}", std::thread::current().name(), cmd);
                     if cmd.extra_opts.print_info {
                         info!("thd_name {:?}, PeerFsmDelegate::handle_msgs, cmd {:?}",
                         std::thread::current().name(), cmd);
@@ -703,11 +703,11 @@ where
                     self.on_tick(tick.peer_tick);
                 }
                 PeerMsg::ApplyRes { res } => {
-                    info!("thd_name {:?}, handle_msgs, ApplyRes {:?}",   std::thread::current().name(), res);
+                    // info!("thd_name {:?}, handle_msgs, ApplyRes {:?}",   std::thread::current().name(), res);
                     self.on_apply_res(res);
                 }
                 PeerMsg::SignificantMsg(msg) => {
-                    info!("thd_name {:?}, handle_msgs, SignificantMsg {:?}", std::thread::current().name(), msg);
+                    // info!("thd_name {:?}, handle_msgs, SignificantMsg {:?}", std::thread::current().name(), msg);
                     self.on_significant_msg(msg);
                 }
                 PeerMsg::CasualMessage(msg) => self.on_casual_msg(msg),
@@ -722,8 +722,8 @@ where
                     peer_id,
                     ready_number,
                 } => {
-                    info!("thd_name {:?}, handle_msgs Persisted, peer_id {}, ready_number {}",
-                    std::thread::current().name(), peer_id, ready_number);
+                    // info!("thd_name {:?}, handle_msgs Persisted, peer_id {}, ready_number {}",
+                    // std::thread::current().name(), peer_id, ready_number);
                     self.on_persisted_msg(peer_id, ready_number);
                 }
                 PeerMsg::UpdateReplicationMode => self.on_update_replication_mode(),
@@ -2358,6 +2358,8 @@ where
         if msg.print_info {
             info!("thd_name {:?}, func_name [PFD::on_raft_message], msg {:?}", 
             thread::current().name(), msg);
+            self.ctx.print_info = true;
+            self.fsm.print_info = true;
         }
         let peer_disk_usage = msg.disk_usage;
         let stepped = Cell::new(false);
