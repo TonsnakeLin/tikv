@@ -4155,6 +4155,7 @@ where
     pub fn schedule_task(&self, region_id: u64, msg: Msg<EK>) {
         let bt = backtrace::Backtrace::new();        
         info!("ApplyRouter::schedule_task"; 
+            "msg" => ?msg,
             "thread_name" => ?std::thread::current().name(),
             "backtrace" => ?bt);
         let reg = match self.try_send(region_id, msg) {
