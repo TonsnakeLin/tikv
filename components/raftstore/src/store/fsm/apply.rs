@@ -4156,13 +4156,13 @@ where
     EK: KvEngine,
 {
     pub fn schedule_task(&self, region_id: u64, msg: Msg<EK>, print_info: bool) {
-        // if print_info {
+        if print_info {
             let bt = backtrace::Backtrace::new();        
             info!("ApplyRouter::schedule_task"; 
                 "backtrace" => ?bt,
                 "msg" => ?msg,
                 "thread_name" => ?std::thread::current().name());
-        // }
+        }
 
         let reg = match self.try_send(region_id, msg) {
             Either::Left(Ok(())) => return,
