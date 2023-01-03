@@ -1094,7 +1094,7 @@ where
             "thread_name" => ?std::thread::current().name());
         }
         ctx.apply_router
-            .schedule_task(self.region_id, ApplyTask::register(self), ctx.print_info);
+            .schedule_task(self.region_id, ApplyTask::register(self), ctx.print_info || self.print_info);
 
         ctx.coprocessor_host.on_region_changed(
             self.region(),
@@ -2505,7 +2505,7 @@ where
                 self.pending_request_snapshot_count
                     .fetch_add(1, Ordering::SeqCst);
                 ctx.apply_router
-                    .schedule_task(self.region_id, ApplyTask::Snapshot(gen_task), ctx.print_info);
+                    .schedule_task(self.region_id, ApplyTask::Snapshot(gen_task), ctx.print_info || self.print_info);
             }
             return None;
         }
@@ -2605,7 +2605,7 @@ where
             self.pending_request_snapshot_count
                 .fetch_add(1, Ordering::SeqCst);
             ctx.apply_router
-                .schedule_task(self.region_id, ApplyTask::Snapshot(gen_task), ctx.print_info);
+                .schedule_task(self.region_id, ApplyTask::Snapshot(gen_task), ctx.print_info||self.print_info);
         }
 
         let state_role = ready.ss().map(|ss| ss.raft_state);
@@ -2788,7 +2788,7 @@ where
         if committed_entries.is_empty() {
             return;
         }
-        if ctx.print_info {
+        if ctx.print_info || self.print_info {
             info!("handle_raft_committed_entries";
             "committed_entries" => ?committed_entries);
         }
@@ -2897,7 +2897,7 @@ where
                 self.mut_store().evict_entry_cache(false);
             }
             ctx.apply_router
-                .schedule_task(self.region_id, ApplyTask::apply(apply, self.print_info), ctx.print_info);
+                .schedule_task(self.region_id, ApplyTask::apply(apply, self.print_info), ctx.print_info||self.print_info);
         }
         fail_point!("after_send_to_apply_1003", self.peer_id() == 1003, |_| {});
     }

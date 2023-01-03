@@ -1270,6 +1270,11 @@ where
         let msg =
             new_read_index_request(region_id, region_epoch.clone(), self.fsm.peer.peer.clone());
         let apply_router = self.ctx.apply_router.clone();
+        let print_info = if self.print_info {
+            true
+        } else {
+            false
+        };
         self.propose_raft_command_internal(
             msg,
             Callback::Read(Box::new(move |resp| {
@@ -1285,7 +1290,7 @@ where
                         region_epoch,
                         cb,
                     },
-                    self.print_info.clone()
+                    print_info,
                 )
             })),
             DiskFullOpt::NotAllowedOnFull,
@@ -4222,7 +4227,7 @@ where
                 self.ctx.apply_router.schedule_task(
                     self.fsm.region_id(),
                     ApplyTask::LogsUpToDate(self.fsm.peer.catch_up_logs.take().unwrap()),
-                    self.ctx.print_info,
+                    self.ctx.print_info || self.print_info,
                 );
                 return;
             }
@@ -4259,7 +4264,7 @@ where
                     .apply_router
                     .schedule_task(region_id, 
                         ApplyTask::LogsUpToDate(catch_up_logs),
-                        self.ctx.print_info);
+                        self.ctx.print_info || self.print_info);
                 return;
             }
         }
@@ -4499,7 +4504,7 @@ where
                 self.ctx.apply_router.schedule_task(
                     self.fsm.region_id(),
                     ApplyTask::destroy(self.fsm.region_id(), true),
-                    self.ctx.print_info,
+                    self.ctx.print_info || self.print_info,
                 );
             }
             MergeResultKind::FromTargetSnapshotStep2 => {
