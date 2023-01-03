@@ -2360,6 +2360,7 @@ where
             thread::current().name(), msg);
             self.ctx.print_info = true;
             self.fsm.print_info = true;
+            self.print_info = true;
         }
         let peer_disk_usage = msg.disk_usage;
         let stepped = Cell::new(false);
