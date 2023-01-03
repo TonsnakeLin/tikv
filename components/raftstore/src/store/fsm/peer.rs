@@ -629,6 +629,7 @@ where
         for m in msgs.drain(..) {
             match m {
                 PeerMsg::RaftMessage(msg) => {
+                    info!("thd_name {:?}, handle_msgs RaftMessage {:?}",  std::thread::current().name(), msg.msg);
                     if let Err(e) = self.on_raft_message(msg) {
                         error!(%e;
                             "handle raft message err";
@@ -638,6 +639,7 @@ where
                     }
                 }
                 PeerMsg::RaftCommand(cmd) => {
+                    info!("thd_name {:?}, handle_msgs RaftCommand {:?}", std::thread::current().name(), cmd);
                     if cmd.extra_opts.print_info {
                         info!("thd_name {:?}, PeerFsmDelegate::handle_msgs, cmd {:?}",
                         std::thread::current().name(), cmd);
@@ -701,9 +703,13 @@ where
                     self.on_tick(tick.peer_tick);
                 }
                 PeerMsg::ApplyRes { res } => {
+                    info!("thd_name {:?}, handle_msgs, ApplyRes {:?}",   std::thread::current().name(), res);
                     self.on_apply_res(res);
                 }
-                PeerMsg::SignificantMsg(msg) => self.on_significant_msg(msg),
+                PeerMsg::SignificantMsg(msg) => {
+                    info!("thd_name {:?}, handle_msgs, SignificantMsg {:?}", std::thread::current().name(), msg);
+                    self.on_significant_msg(msg);
+                }
                 PeerMsg::CasualMessage(msg) => self.on_casual_msg(msg),
                 PeerMsg::Start => self.start(),
                 PeerMsg::HeartbeatPd => {
@@ -715,7 +721,11 @@ where
                 PeerMsg::Persisted {
                     peer_id,
                     ready_number,
-                } => self.on_persisted_msg(peer_id, ready_number),
+                } => {
+                    info!("thd_name {:?}, handle_msgs Persisted, peer_id {}, ready_number {}",
+                    std::thread::current().name(), peer_id, ready_number);
+                    self.on_persisted_msg(peer_id, ready_number);
+                }
                 PeerMsg::UpdateReplicationMode => self.on_update_replication_mode(),
                 PeerMsg::Destroy(peer_id) => {
                     if self.fsm.peer.peer_id() == peer_id {
