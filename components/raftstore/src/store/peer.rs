@@ -2798,11 +2798,6 @@ where
             |_| ()
         );
 
-        if ctx.print_info {
-            info!("handle_raft_committed_entries";
-            "committed_entries" => ?committed_entries);
-        }
-
         assert!(
             !self.is_handling_snapshot(),
             "{} is applying snapshot when it is ready to handle committed entries",
@@ -2889,6 +2884,7 @@ where
                 cbs,
                 self.region_buckets.as_ref().map(|b| b.meta.clone()),
             );
+            apply.print_info = self.print_info|ctx.print_info;
             apply.on_schedule(&ctx.raft_metrics);
             self.mut_store()
                 .trace_cached_entries(apply.entries[0].clone());
@@ -2897,7 +2893,7 @@ where
                 self.mut_store().evict_entry_cache(false);
             }
             ctx.apply_router
-                .schedule_task(self.region_id, ApplyTask::apply(apply, self.print_info), ctx.print_info||self.print_info);
+                .schedule_task(self.region_id, ApplyTask::apply(apply, self.print_info|ctx.print_info), ctx.print_info||self.print_info);
         }
         fail_point!("after_send_to_apply_1003", self.peer_id() == 1003, |_| {});
     }

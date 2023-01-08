@@ -2959,6 +2959,7 @@ where
     pub entries_size: usize,
     pub cbs: Vec<Proposal<S>>,
     pub bucket_meta: Option<Arc<BucketMeta>>,
+    pub print_info: bool,
 }
 
 impl<S: Snapshot> Apply<S> {
@@ -2987,6 +2988,7 @@ impl<S: Snapshot> Apply<S> {
             entries_size,
             cbs,
             bucket_meta: buckets,
+            print_info: false,
         }
     }
 
@@ -3274,9 +3276,9 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Msg::Apply { apply, .. } => {
-                write!(f, "[region {}] async apply, [peer {}], [term {}], [commit_index {}], [commit_term {}]", 
-                    apply.region_id, apply.peer_id, apply.term, apply.commit_index, apply.commit_term)
+            Msg::Apply { apply, print_info, .. } => {
+                write!(f, "[region {}] async apply, [peer {}], [term {}], [commit_index {}], [commit_term {}], [apply.print_info {}], [msg.print_info {}]", 
+                    apply.region_id, apply.peer_id, apply.term, apply.commit_index, apply.commit_term, apply.print_info, print_info)
             }
             Msg::Registration(ref r) => {
                 write!(f, "[region {}] Reg {:?}", r.region.get_id(), r.apply_state)
