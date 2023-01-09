@@ -422,6 +422,7 @@ where
     apply_time: LocalHistogram,
 
     key_buffer: Vec<u8>,
+    print_info: bool,
 }
 
 impl<EK> ApplyContext<EK>
@@ -474,6 +475,7 @@ where
             apply_wait: APPLY_TASK_WAIT_TIME_HISTOGRAM.local(),
             apply_time: APPLY_TIME_HISTOGRAM.local(),
             key_buffer: Vec::with_capacity(1024),
+            print_info: false,
         }
     }
 
@@ -1072,11 +1074,20 @@ where
             |_| ApplyResult::Yield
         );
 
+        if apply_ctx.print_info {
+            info!("ApplyDelegate::handle_raft_entry_normal"; 
+            "thread_name" => std::thread::current().name(),
+            "entry" => ?entry);
+        }
+
         let index = entry.get_index();
         let term = entry.get_term();
         let data = entry.get_data();
 
         if !data.is_empty() {
+            if apply_ctx.print_info {
+                info!("ApplyDelegate::handle_raft_entry_normal, data of entry is not empty");
+            }
             let cmd = util::parse_data_at(data, index, &self.tag);
 
             if apply_ctx.yield_high_latency_operation && has_high_latency_operation(&cmd) {
@@ -1218,6 +1229,12 @@ where
             );
         }
 
+        if cmd.get_header().get_print_info() {
+            info!("ApplyDelegate::process_raft_cmd"; 
+            "thread_name" => std::thread::current().name(),
+            "RaftCmd" => ?cmd);
+        }
+
         // Set sync log hint if the cmd requires so.
         apply_ctx.sync_log_hint |= should_sync_log(&cmd);
 
@@ -1270,12 +1287,21 @@ where
         // if pending remove, apply should be aborted already.
         assert!(!self.pending_remove);
 
+        if req.get_header().get_print_info() {
+            info!("ApplyDelegate::apply_raft_cmd"; 
+            "thread_name" => std::thread::current().name(),
+            "RaftCmdReq" => ?req);
+        }
+
         // Remember if the raft cmd fails to be applied, it must have no side effects.
         // E.g. `RaftApplyState` must not be changed.
 
         let mut origin_epoch = None;
         let (resp, exec_result) = if ctx.host.pre_exec(&self.region, req, index, term) {
             // One of the observers want to filter execution of the command.
+            if req.get_header().get_print_info() {
+                info!("ctx.host.pre_exec returns true");
+            }
             let mut resp = RaftCmdResponse::default();
             if !req.get_header().get_uuid().is_empty() {
                 let uuid = req.get_header().get_uuid().to_vec();
@@ -1283,6 +1309,9 @@ where
             }
             (resp, ApplyResult::None)
         } else {
+            if req.get_header().get_print_info() {
+                info!("ctx.host.pre_exec returns false");
+            }
             ctx.exec_log_index = index;
             ctx.exec_log_term = term;
             ctx.kv_wb_mut().set_save_point();
@@ -1315,6 +1344,7 @@ where
             };
             (resp, exec_result)
         };
+
         if let ApplyResult::WaitMergeSource(_) = exec_result {
             return (resp, exec_result, false);
         }
@@ -1393,7 +1423,13 @@ where
                 );
             }
         }
-
+        if cmd.get_header().get_print_info() {
+            if req.get_header().get_print_info() {
+                info!("ApplyDelegate::apply_raft_cmd";
+                "resp" => ?resp,
+                "exec_result" => ?exec_result);
+            }
+        }
         (resp, exec_result, should_write)
     }
 
@@ -3029,6 +3065,9 @@ impl<S: Snapshot> Apply<S> {
             self.entries_size += other.entries_size;
 
             self.cbs.append(&mut other.cbs);
+            if other.print_info {
+                self.print_info = true;
+            }
             true
         } else {
             false
@@ -3402,6 +3441,16 @@ where
 
         if self.delegate.pending_remove || self.delegate.stopped {
             return;
+        }
+
+        if apply.print_info {
+            info!("ApplyFsm::handle_apply"; 
+            "thread_name" => std::thread::current().name(),
+            "peer_id" => apply.peer_id,
+            "region_id" => apply.region_id,
+            "term" => apply.term,
+            "commit_index" => apply.commit_index,
+            "commit_term" => apply.commit_term);
         }
 
         let mut entries = Vec::new();
@@ -3778,6 +3827,7 @@ where
                     }
 
                     if print_info {
+                        apply_ctx.print_info = true;
                         info!("ApplyFsm::handle_tasks"; 
                         "thread_name" => std::thread::current().name(),
                         "peer_id" => apply.peer_id,
@@ -3971,6 +4021,7 @@ where
     fn handle_normal(&mut self, normal: &mut impl DerefMut<Target = ApplyFsm<EK>>) -> HandleResult {
         let mut handle_result = HandleResult::KeepProcessing;
         normal.delegate.handle_start = Some(Instant::now_coarse());
+        self.apply_ctx.print_info = false;
         if normal.delegate.yield_state.is_some() {
             if normal.delegate.wait_merge_state.is_some() {
                 // We need to query the length first, otherwise there is a race
@@ -4028,12 +4079,17 @@ where
     }
 
     fn end(&mut self, fsms: &mut [Option<impl DerefMut<Target = ApplyFsm<EK>>>]) {
+        if self.apply_ctx.print_info {
+            info!("ApplyPoller::end"; 
+            "thread_name" => std::thread::current().name());
+        }
         self.apply_ctx.flush();
         for fsm in fsms.iter_mut().flatten() {
             fsm.delegate.last_flush_applied_index = fsm.delegate.apply_state.get_applied_index();
             fsm.delegate.update_memory_trace(&mut self.trace_event);
         }
         MEMTRACE_APPLYS.trace(mem::take(&mut self.trace_event));
+        self.apply_ctx.print_info = false;
     }
 
     fn get_priority(&self) -> Priority {
