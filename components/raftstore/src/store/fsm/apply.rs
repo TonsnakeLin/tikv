@@ -1427,7 +1427,8 @@ where
         if req.get_header().get_print_info() {
             info!("ApplyDelegate::apply_raft_cmd";
             "resp" => ?resp,
-            "exec_result" => ?exec_result);
+            "exec_result" => ?exec_result,
+            "should_write" => ?should_write);
         }
         
         (resp, exec_result, should_write)
