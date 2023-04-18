@@ -97,13 +97,15 @@ impl SecurityConfig {
         {
             return Err("ca, cert and private key should be all configured.".into());
         }
+        // we will support encrrption for partitioned-raft-kv
+        /*
         if raftstore_v2
             && self.encryption.data_encryption_method
                 != kvproto::encryptionpb::EncryptionMethod::Plaintext
         {
             return Err("encryption is not supported for partitioned-raft-kv".into());
         }
-
+        */
         Ok(())
     }
 
