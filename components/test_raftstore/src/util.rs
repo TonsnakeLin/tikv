@@ -616,7 +616,7 @@ pub fn create_test_engine(
     let sst_worker = LazyWorker::new("sst-recovery");
     let scheduler = sst_worker.scheduler();
 
-    let (raft_engine, raft_statistics) = RaftTestEngine::build(&cfg, &env, &key_manager, &cache);
+    let (raft_engine, raft_statistics) = RaftTestEngine::build(&cfg, &env.0.as_ref().unwrap(), &key_manager, &cache);
 
     let mut builder =
         KvEngineFactoryBuilder::new(env, &cfg, cache).sst_recovery_sender(Some(scheduler));

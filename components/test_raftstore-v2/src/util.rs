@@ -60,7 +60,7 @@ pub fn create_test_engine(
     let sst_worker = LazyWorker::new("sst-recovery");
     let scheduler = sst_worker.scheduler();
 
-    let (raft_engine, raft_statistics) = RaftTestEngine::build(&cfg, &env, &key_manager, &cache);
+    let (raft_engine, raft_statistics) = RaftTestEngine::build(&cfg, &env.0.as_ref().unwrap(), &key_manager, &cache);
 
     if let Some((cluster_id, store_id)) = id {
         assert_ne!(store_id, 0);

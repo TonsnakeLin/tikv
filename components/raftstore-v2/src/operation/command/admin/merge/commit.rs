@@ -410,7 +410,7 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
         let ctx = TabletContext::new(source_region, None);
         let source_tablet = reg
             .tablet_factory()
-            .open_tablet(ctx, &source_path)
+            .open_tablet(ctx, &source_path, false)
             .unwrap_or_else(|e| {
                 slog_panic!(self.logger, "failed to open source checkpoint"; "err" => ?e);
             });
@@ -447,7 +447,7 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
                     "error" => ?e
                 )
             });
-        let tablet = reg.tablet_factory().open_tablet(ctx, &path).unwrap();
+        let tablet = reg.tablet_factory().open_tablet(ctx, &path, false).unwrap();
         if let Some(guard) = guard {
             tablet
                 .merge(&[&source_tablet, self.tablet()])

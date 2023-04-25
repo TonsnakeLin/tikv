@@ -40,7 +40,7 @@ pub struct KvEngineFactoryBuilder {
 }
 
 impl KvEngineFactoryBuilder {
-    pub fn new(env: Arc<Env>, config: &TikvConfig, cache: Cache) -> Self {
+    pub fn new(env: (Option<Arc<Env>>, Option<Arc<Env>>), config: &TikvConfig, cache: Cache) -> Self {
         Self {
             inner: FactoryInner {
                 region_info_accessor: None,
@@ -136,12 +136,12 @@ impl KvEngineFactory {
         self.inner.db_resources.statistics.clone()
     }
 
-    fn db_opts(&self, for_engine: EngineType) -> RocksDbOptions {
+    fn db_opts(&self, for_engine: EngineType, use_encryp_env: bool) -> RocksDbOptions {
         // Create kv engine.
         let mut db_opts = self
             .inner
             .rocksdb_config
-            .build_opt(&self.inner.db_resources, for_engine);
+            .build_opt(&self.inner.db_resources, for_engine, use_encryp_env);
         if !self.inner.lite {
             db_opts.add_event_listener(RocksEventListener::new(
                 "kv",
@@ -177,7 +177,7 @@ impl KvEngineFactory {
     /// It will always create in path/DEFAULT_DB_SUB_DIR.
     pub fn create_shared_db(&self, path: impl AsRef<Path>) -> Result<RocksEngine> {
         let path = path.as_ref();
-        let mut db_opts = self.db_opts(EngineType::RaftKv);
+        let mut db_opts = self.db_opts(EngineType::RaftKv, false);
         let cf_opts = self.cf_opts(None, EngineType::RaftKv);
         if let Some(listener) = &self.inner.flow_listener {
             db_opts.add_event_listener(listener.clone());
@@ -193,8 +193,8 @@ impl KvEngineFactory {
 }
 
 impl TabletFactory<RocksEngine> for KvEngineFactory {
-    fn open_tablet(&self, ctx: TabletContext, path: &Path) -> Result<RocksEngine> {
-        let mut db_opts = self.db_opts(EngineType::RaftKv2);
+    fn open_tablet(&self, ctx: TabletContext, path: &Path, use_encryp_env: bool) -> Result<RocksEngine> {
+        let mut db_opts = self.db_opts(EngineType::RaftKv2, use_encryp_env);
         let tablet_name = path.file_name().unwrap().to_str().unwrap().to_string();
         db_opts.set_info_log(TabletLogger::new(tablet_name));
         let factory = RangeCompactionFilterFactory::new(ctx.start_key.clone(), ctx.end_key.clone());
@@ -222,10 +222,10 @@ impl TabletFactory<RocksEngine> for KvEngineFactory {
         kv_engine
     }
 
-    fn destroy_tablet(&self, ctx: TabletContext, path: &Path) -> Result<()> {
+    fn destroy_tablet(&self, ctx: TabletContext, path: &Path, use_encryp_env: bool) -> Result<()> {
         info!("destroy tablet"; "path" => %path.display(), "region_id" => ctx.id, "suffix" => ?ctx.suffix);
         // Create kv engine.
-        let _db_opts = self.db_opts(EngineType::RaftKv2);
+        let _db_opts = self.db_opts(EngineType::RaftKv2, use_encryp_env);
         let _cf_opts = self.cf_opts(None, EngineType::RaftKv2);
         // TODOTODO: call rust-rocks or tirocks to destroy_engine;
         // engine_rocks::util::destroy_engine(
@@ -294,12 +294,12 @@ mod tests {
         let mut tablet_ctx = TabletContext::with_infinite_region(1, Some(3));
         let engine = reg
             .tablet_factory()
-            .open_tablet(tablet_ctx.clone(), &path)
+            .open_tablet(tablet_ctx.clone(), &path, false)
             .unwrap();
         assert!(reg.tablet_factory().exists(&path));
         // Second attempt should fail with lock.
         reg.tablet_factory()
-            .open_tablet(tablet_ctx.clone(), &path)
+            .open_tablet(tablet_ctx.clone(), &path, false)
             .unwrap_err();
         drop(engine);
         tablet_ctx.suffix = Some(3);
@@ -321,7 +321,7 @@ mod tests {
         };
         let tablet_ctx = TabletContext::new(&region, Some(3));
         let path = reg.tablet_path(1, 3);
-        let engine = reg.tablet_factory().open_tablet(tablet_ctx, &path).unwrap();
+        let engine = reg.tablet_factory().open_tablet(tablet_ctx, &path, false).unwrap();
         engine.put(&keys::data_key(b"k0"), b"v0").unwrap();
         engine.put(&keys::data_key(b"k1"), b"v1").unwrap();
         engine.put(&keys::data_key(b"k2"), b"v2").unwrap();

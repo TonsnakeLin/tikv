@@ -238,7 +238,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
             let tablet = ctx
                 .tablet_registry
                 .tablet_factory()
-                .open_tablet(tablet_ctx, &path)
+                .open_tablet(tablet_ctx, &path, false)
                 .unwrap_or_else(|e| {
                     slog_panic!(
                         self.logger,

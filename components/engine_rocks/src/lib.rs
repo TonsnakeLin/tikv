@@ -117,10 +117,19 @@ pub use flow_control_factors::*;
 
 pub mod raw;
 
+// return value:
+//   first is the encrption env if key_manager is not none, else it is the non-encrption env.
+//   second is the non-encryption env.
 pub fn get_env(
     key_manager: Option<std::sync::Arc<::encryption::DataKeyManager>>,
     limiter: Option<std::sync::Arc<::file_system::IoRateLimiter>>,
-) -> engine_traits::Result<std::sync::Arc<raw::Env>> {
-    let env = encryption::get_env(None /* base_env */, key_manager)?;
-    file_system::get_env(Some(env), limiter)
+) -> engine_traits::Result<(Option<std::sync::Arc<raw::Env>>, Option<std::sync::Arc<raw::Env>>)> {
+    let has_key_manager = key_manager.is_some();
+    let env1 = encryption::get_env(None /* base_env */, key_manager)?;
+    let env = file_system::get_env(Some(env1), limiter)?;
+
+    let env2 = encryption::get_env(None , None)?;
+    let env_no_encrp = file_system::get_env(Some(env2), limiter)?;
+    
+    return Ok((Some(env), Some(env_no_encrp)))
 }

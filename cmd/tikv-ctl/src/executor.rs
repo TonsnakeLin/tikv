@@ -79,7 +79,7 @@ pub fn new_debug_executor(
 
     let cfg_controller = ConfigController::default();
     if !cfg.raft_engine.enable {
-        let raft_db_opts = cfg.raftdb.build_opt(env, None);
+        let raft_db_opts = cfg.raftdb.build_opt(env.0.unwrap(), None);
         let raft_db_cf_opts = cfg.raftdb.build_cf_opts(factory.block_cache());
         let raft_path = cfg.infer_raft_db_path(Some(data_dir)).unwrap();
         if !db_exist(&raft_path) {

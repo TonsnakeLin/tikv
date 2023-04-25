@@ -119,7 +119,7 @@ pub mod kv {
     }
 
     impl TabletFactory<KvTestEngine> for TestTabletFactory {
-        fn open_tablet(&self, ctx: TabletContext, path: &Path) -> Result<KvTestEngine> {
+        fn open_tablet(&self, ctx: TabletContext, path: &Path, _use_encryp_env: bool) -> Result<KvTestEngine> {
             KvTestEngine::new_tablet(
                 path.to_str().unwrap(),
                 ctx,
@@ -410,7 +410,7 @@ pub mod ctor {
             ) -> Result<Self> {
                 let mut rocks_db_opts = RocksDbOptions::default();
                 let env = get_env(db_opt.key_manager.clone(), db_opt.rate_limiter)?;
-                rocks_db_opts.set_env(env);
+                rocks_db_opts.set_env(env.0.unwrap());
                 rocks_db_opts.enable_unordered_write(false);
                 rocks_db_opts.enable_pipelined_write(false);
                 rocks_db_opts.enable_multi_batch_write(false);
@@ -483,7 +483,7 @@ pub mod ctor {
         fn get_rocks_db_opts(db_opts: DbOptions) -> Result<RocksDbOptions> {
             let mut rocks_db_opts = RocksDbOptions::default();
             let env = get_env(db_opts.key_manager.clone(), db_opts.rate_limiter)?;
-            rocks_db_opts.set_env(env);
+            rocks_db_opts.set_env(env.0.unwrap());
             if db_opts.enable_multi_batch_write {
                 rocks_db_opts.enable_unordered_write(false);
                 rocks_db_opts.enable_pipelined_write(false);

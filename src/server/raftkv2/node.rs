@@ -120,7 +120,7 @@ where
             let path = registry.tablet_path(region.get_id(), RAFT_INIT_LOG_INDEX);
             let ctx = TabletContext::new(&region, Some(RAFT_INIT_LOG_INDEX));
             // TODO: make follow line can recover from abort.
-            registry.tablet_factory().open_tablet(ctx, &path).unwrap();
+            registry.tablet_factory().open_tablet(ctx, &path, false).unwrap();
         }
 
         // Put store only if the cluster is bootstrapped.

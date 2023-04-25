@@ -1186,7 +1186,7 @@ impl<CER: ConfiguredRaftEngine> TikvServer<CER> {
         // Create raft engine
         let (raft_engine, raft_statistics) = CER::build(
             &self.core.config,
-            &env,
+            &env.0.as_ref().unwrap(),
             &self.core.encryption_key_manager,
             &block_cache,
         );
@@ -1311,7 +1311,7 @@ mod test {
 
         for i in 1..6 {
             let ctx = TabletContext::with_infinite_region(i, Some(10));
-            reg.load(ctx, true).unwrap();
+            reg.load(ctx, true, false).unwrap();
         }
 
         let mut cached = reg.get(1).unwrap();
@@ -1330,7 +1330,7 @@ mod test {
             .unwrap();
 
         let ctx = TabletContext::with_infinite_region(1, Some(20));
-        reg.load(ctx, true).unwrap();
+        reg.load(ctx, true, false).unwrap();
         tablet = cached.latest().unwrap();
 
         for i in 1..11 {

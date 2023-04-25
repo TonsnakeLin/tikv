@@ -692,7 +692,7 @@ fn build_rocks_opts(cfg: &TikvConfig) -> engine_rocks::RocksDbOptions {
         .map(Arc::new);
     let env = get_env(key_manager, None /* io_rate_limiter */).unwrap();
     let resource = cfg.rocksdb.build_resources(env);
-    cfg.rocksdb.build_opt(&resource, cfg.storage.engine)
+    cfg.rocksdb.build_opt(&resource, cfg.storage.engine, false)
 }
 
 fn run_ldb_command(args: Vec<String>, cfg: &TikvConfig) {

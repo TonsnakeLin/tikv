@@ -1044,7 +1044,7 @@ impl SstImporter {
         let env = get_env(self.key_manager.clone(), get_io_rate_limiter())?;
         // Use abstracted SstReader after Env is abstracted.
         let dst_file_name = path.temp.to_str().unwrap();
-        let sst_reader = RocksSstReader::open_with_env(dst_file_name, Some(env))?;
+        let sst_reader = RocksSstReader::open_with_env(dst_file_name, env.0)?;
         sst_reader.verify_checksum()?;
 
         // undo key rewrite so we could compare with the keys inside SST
@@ -1434,7 +1434,7 @@ mod tests {
 
         let db_path = temp_dir.path().join("db");
         let env = get_env(key_manager.clone(), None /* io_rate_limiter */).unwrap();
-        let db = new_test_engine_with_env(db_path.to_str().unwrap(), &[CF_DEFAULT], env);
+        let db = new_test_engine_with_env(db_path.to_str().unwrap(), &[CF_DEFAULT], env.0);
 
         let cases = vec![(0, 10), (5, 15), (10, 20), (0, 100)];
 
@@ -2253,7 +2253,7 @@ mod tests {
 
         let db_path = temp_dir.path().join("db");
         let env = get_env(Some(key_manager), None /* io_rate_limiter */).unwrap();
-        let db = new_test_engine_with_env(db_path.to_str().unwrap(), DATA_CFS, env.clone());
+        let db = new_test_engine_with_env(db_path.to_str().unwrap(), DATA_CFS, env.0.clone());
 
         let range = importer
             .download::<TestEngine>(

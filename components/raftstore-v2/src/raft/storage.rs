@@ -430,7 +430,7 @@ mod tests {
             snap_index,
         ));
         reg.tablet_factory()
-            .open_tablet(TabletContext::new(&region, Some(snap_index)), &path)
+            .open_tablet(TabletContext::new(&region, Some(snap_index)), &path, false)
             .unwrap();
         let snapshot = new_empty_snapshot(region.clone(), snap_index, snap_term, false);
         let mut task = WriteTask::new(region.get_id(), 5, 1);

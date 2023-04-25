@@ -127,7 +127,7 @@ impl RocksEngine {
         let worker = Worker::new("engine-rocksdb");
         let mut db_opts = db_opts.unwrap_or_default();
         if io_rate_limiter.is_some() {
-            db_opts.set_env(get_env(None /* key_manager */, io_rate_limiter).unwrap());
+            db_opts.set_env(get_env(None /* key_manager */, io_rate_limiter).unwrap().0.unwrap());
         }
 
         let db = engine_rocks::util::new_engine_opt(&path, db_opts, cfs_opts)?;

@@ -141,7 +141,7 @@ impl TabletContext {
 // rename engine to tablet, so always use tablet for new traits/types.
 pub trait TabletFactory<EK>: Send + Sync {
     /// Open the tablet in `path`.
-    fn open_tablet(&self, ctx: TabletContext, path: &Path) -> Result<EK>;
+    fn open_tablet(&self, ctx: TabletContext, path: &Path, use_encryp_env: bool) -> Result<EK>;
 
     /// Destroy the tablet and its data
     fn destroy_tablet(&self, ctx: TabletContext, path: &Path) -> Result<()>;
@@ -172,7 +172,7 @@ impl<EK: Clone + Send + Sync> TabletFactory<EK> for SingletonFactory<EK> {
     /// likely the region Id, the suffix could be the current raft log
     /// index. The reason to have suffix is that we can keep more than one
     /// tablet for a region.
-    fn open_tablet(&self, _ctx: TabletContext, _path: &Path) -> Result<EK> {
+    fn open_tablet(&self, _ctx: TabletContext, _path: &Path, _use_encryp_env: bool) -> Result<EK> {
         Ok(self.tablet.clone())
     }
 
@@ -286,7 +286,7 @@ impl<EK> TabletRegistry<EK> {
     /// Load the tablet and set it as the latest.
     ///
     /// If the tablet doesn't exist, it will create an empty one.
-    pub fn load(&self, ctx: TabletContext, create: bool) -> Result<CachedTablet<EK>>
+    pub fn load(&self, ctx: TabletContext, create: bool, use_encryp_env: bool) -> Result<CachedTablet<EK>>
     where
         EK: Clone,
     {
@@ -301,7 +301,7 @@ impl<EK> TabletRegistry<EK> {
             )));
         }
         // TODO: use compaction filter to trim range.
-        let tablet = self.tablets.factory.open_tablet(ctx, &path)?;
+        let tablet = self.tablets.factory.open_tablet(ctx, &path, use_encryp_env)?;
         let mut cached = self.get_or_default(id);
         cached.set(tablet);
         Ok(cached)
@@ -370,12 +370,12 @@ mod tests {
         let singleton = SingletonFactory::new(tablet.clone());
         let registry = TabletRegistry::new(Box::new(singleton), "").unwrap();
         let mut ctx = TabletContext::with_infinite_region(1, Some(1));
-        registry.load(ctx.clone(), true).unwrap();
+        registry.load(ctx.clone(), true, false).unwrap();
         let mut cached = registry.get(1).unwrap();
         assert_eq!(cached.latest().cloned(), Some(tablet.clone()));
 
         ctx.id = 2;
-        registry.load(ctx.clone(), true).unwrap();
+        registry.load(ctx.clone(), true, false).unwrap();
         let mut count = 0;
         registry.for_each_opened_tablet(|id, cached| {
             assert!(&[1, 2].contains(&id), "{}", id);
@@ -393,7 +393,7 @@ mod tests {
 
         // Exist check should always succeed.
         ctx.id = 3;
-        registry.load(ctx, false).unwrap();
+        registry.load(ctx, false, false).unwrap();
         let mut cached = registry.get(3).unwrap();
         assert_eq!(cached.latest().cloned(), Some(tablet));
     }
@@ -405,7 +405,7 @@ mod tests {
     }
 
     impl TabletFactory<Record> for MemoryTablet {
-        fn open_tablet(&self, ctx: TabletContext, path: &Path) -> Result<Record> {
+        fn open_tablet(&self, ctx: TabletContext, path: &Path, _use_encryp_env: bool) -> Result<Record> {
             let mut tablet = self.tablet.lock().unwrap();
             if tablet.contains_key(path) {
                 return Err(Error::Other(box_err!("tablet is opened")));
@@ -434,9 +434,9 @@ mod tests {
         let registry = TabletRegistry::new(Box::new(factory), "").unwrap();
 
         let mut ctx = TabletContext::with_infinite_region(1, Some(10));
-        let mut tablet_1_10 = registry.load(ctx.clone(), true).unwrap();
+        let mut tablet_1_10 = registry.load(ctx.clone(), true, false).unwrap();
         // It's open already, load it twice should report lock error.
-        registry.load(ctx.clone(), true).unwrap_err();
+        registry.load(ctx.clone(), true, false).unwrap_err();
         let mut cached = registry.get(1).unwrap();
         assert_eq!(cached.latest(), tablet_1_10.latest());
 
@@ -447,14 +447,14 @@ mod tests {
         assert!(!registry.tablet_factory().exists(&tablet_path));
         // Not exist tablet should report error.
         ctx.suffix = Some(11);
-        registry.load(ctx.clone(), false).unwrap_err();
+        registry.load(ctx.clone(), false, false).unwrap_err();
         assert!(registry.get(2).is_none());
         // Though path not exist, but we should be able to create an empty one.
         assert_eq!(registry.get_or_default(2).latest(), None);
         assert!(!registry.tablet_factory().exists(&tablet_path));
 
         // Load new suffix should update cache.
-        registry.load(ctx, true).unwrap();
+        registry.load(ctx, true, false).unwrap();
         assert_ne!(cached.latest(), tablet_1_10.cache());
         let tablet_path = registry.tablet_path(1, 11);
         assert!(registry.tablet_factory().exists(&tablet_path));

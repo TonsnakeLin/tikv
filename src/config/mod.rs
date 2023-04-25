@@ -1228,7 +1228,7 @@ pub struct DbConfig {
 #[derive(Clone)]
 pub struct DbResources {
     // DB Options.
-    pub env: Arc<Env>,
+    pub env: (Option<Arc<Env>>, Option<Arc<Env>>),
     pub statistics: Arc<RocksStatistics>,
     pub rate_limiter: Option<Arc<RateLimiter>>,
     pub write_buffer_manager: Option<Arc<WriteBufferManager>>,
@@ -1318,7 +1318,7 @@ impl DbConfig {
         }
     }
 
-    pub fn build_resources(&self, env: Arc<Env>) -> DbResources {
+    pub fn build_resources(&self, env: (Option<Arc<Env>>, Option<Arc<Env>>)) -> DbResources {
         let rate_limiter = if self.rate_bytes_per_sec.0 > 0 {
             Some(Arc::new(RateLimiter::new_writeampbased_with_auto_tuned(
                 self.rate_bytes_per_sec.0 as i64,
@@ -1344,7 +1344,8 @@ impl DbConfig {
         }
     }
 
-    pub fn build_opt(&self, shared: &DbResources, for_engine: EngineType) -> RocksDbOptions {
+    pub fn build_opt(&self, shared: &DbResources, 
+                    for_engine: EngineType, use_encryp_env: bool) -> RocksDbOptions {
         let mut opts = RocksDbOptions::default();
         opts.set_wal_recovery_mode(self.wal_recovery_mode);
         if !self.wal_dir.is_empty() {
@@ -1393,7 +1394,17 @@ impl DbConfig {
         if self.titan.enabled {
             opts.set_titandb_options(&self.titan.build_opts());
         }
-        opts.set_env(shared.env.clone());
+        if for_engine == EngineType::RaftKV2 {
+            if use_encrp_env {
+                opts.set_env(shared.env.0.unwrap().clone());
+                // todo: check env.0 is encrption env
+            } else {
+                opts.set_env(shared.env.1.unwrap().clone());
+            }
+        } else {
+            // todo: check that use_encryp_env is false
+            opts.set_env(shared.env.0.unwrap().clone());
+        }        
         opts.set_statistics(&shared.statistics);
         if let Some(r) = &shared.rate_limiter {
             opts.set_rate_limiter(r);
@@ -3781,7 +3792,7 @@ impl TikvConfig {
         &self,
         key_manager: Option<Arc<DataKeyManager>>,
         limiter: Option<Arc<IoRateLimiter>>,
-    ) -> Result<Arc<Env>, String> {
+    ) -> Result<(Option<Arc<Env>>, Option<Arc<Env>>), String> {
         let env = get_env(key_manager, limiter)?;
         if !self.raft_engine.enable {
             // RocksDB makes sure there are at least `max_background_flushes`
@@ -4553,7 +4564,7 @@ mod tests {
         let resource = tikv_cfg.rocksdb.build_resources(Arc::new(Env::default()));
         tikv_cfg
             .rocksdb
-            .build_opt(&resource, tikv_cfg.storage.engine);
+            .build_opt(&resource, tikv_cfg.storage.engine, false);
     }
 
     #[test]
@@ -4714,10 +4725,10 @@ mod tests {
         Arc<FlowController>,
     ) {
         assert_eq!(F::TAG, cfg.storage.api_version());
-        let resource = cfg.rocksdb.build_resources(Arc::default());
+        let resource = cfg.rocksdb.build_resources((Some(Arc::default()),Some(Arc::default())));
         let engine = RocksDBEngine::new(
             &cfg.storage.data_dir,
-            Some(cfg.rocksdb.build_opt(&resource, cfg.storage.engine)),
+            Some(cfg.rocksdb.build_opt(&resource, cfg.storage.engine, false)),
             cfg.rocksdb.build_cf_opts(
                 &cfg.rocksdb.build_cf_resources(
                     cfg.storage
