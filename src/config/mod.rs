@@ -1394,16 +1394,16 @@ impl DbConfig {
         if self.titan.enabled {
             opts.set_titandb_options(&self.titan.build_opts());
         }
-        if for_engine == EngineType::RaftKV2 {
-            if use_encrp_env {
-                opts.set_env(shared.env.0.unwrap().clone());
+        if for_engine == EngineType::RaftKv2 {
+            if use_encryp_env {
+                opts.set_env(shared.env.0.as_ref().unwrap().clone());
                 // todo: check env.0 is encrption env
             } else {
-                opts.set_env(shared.env.1.unwrap().clone());
+                opts.set_env(shared.env.1.as_ref().unwrap().clone());
             }
         } else {
             // todo: check that use_encryp_env is false
-            opts.set_env(shared.env.0.unwrap().clone());
+            opts.set_env(shared.env.0.as_ref().unwrap().clone());
         }        
         opts.set_statistics(&shared.statistics);
         if let Some(r) = &shared.rate_limiter {
@@ -3799,7 +3799,10 @@ impl TikvConfig {
             // high-priority workers in env. That is not enough when multiple
             // RocksDB instances share the same env. We manually configure the
             // worker count in this case.
-            env.set_high_priority_background_threads(
+            env.0.as_ref().unwrap().set_high_priority_background_threads(
+                self.raftdb.max_background_flushes + self.rocksdb.max_background_flushes,
+            );
+            env.1.as_ref().unwrap().set_high_priority_background_threads(
                 self.raftdb.max_background_flushes + self.rocksdb.max_background_flushes,
             );
         }

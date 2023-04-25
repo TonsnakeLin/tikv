@@ -407,7 +407,7 @@ impl ImportDir {
             let path = self.join(meta)?;
             let path_str = path.save.to_str().unwrap();
             let env = get_env(key_manager.clone(), get_io_rate_limiter())?;
-            let sst_reader = RocksSstReader::open_with_env(path_str, Some(env))?;
+            let sst_reader = RocksSstReader::open_with_env(path_str, env.0)?;
             sst_reader.verify_checksum()?;
         }
         Ok(())

@@ -149,7 +149,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
             let mut ctx = TabletContext::new(&region, Some(tablet_index));
             ctx.flush_state = Some(flush_state.clone());
             // TODO: Perhaps we should stop create the tablet automatically.
-            tablet_registry.load(ctx, false)?;
+            tablet_registry.load(ctx, false, false)?;
         }
         let cached_tablet = tablet_registry.get_or_default(region_id);
 

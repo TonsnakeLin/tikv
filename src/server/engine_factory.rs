@@ -222,10 +222,11 @@ impl TabletFactory<RocksEngine> for KvEngineFactory {
         kv_engine
     }
 
-    fn destroy_tablet(&self, ctx: TabletContext, path: &Path, use_encryp_env: bool) -> Result<()> {
+    // todo: add the param `use_encryp_env` 
+    fn destroy_tablet(&self, ctx: TabletContext, path: &Path) -> Result<()> {
         info!("destroy tablet"; "path" => %path.display(), "region_id" => ctx.id, "suffix" => ?ctx.suffix);
         // Create kv engine.
-        let _db_opts = self.db_opts(EngineType::RaftKv2, use_encryp_env);
+        let _db_opts = self.db_opts(EngineType::RaftKv2, false);
         let _cf_opts = self.cf_opts(None, EngineType::RaftKv2);
         // TODOTODO: call rust-rocks or tirocks to destroy_engine;
         // engine_rocks::util::destroy_engine(
