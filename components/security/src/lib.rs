@@ -87,7 +87,7 @@ pub struct ClientSuite {
 
 impl SecurityConfig {
     /// Validates ca, cert and private key.
-    pub fn validate(&self, raftstore_v2: bool) -> Result<(), Box<dyn Error>> {
+    pub fn validate(&self, _raftstore_v2: bool) -> Result<(), Box<dyn Error>> {
         check_key_file("ca key", &self.ca_path)?;
         check_key_file("cert key", &self.cert_path)?;
         check_key_file("private key", &self.key_path)?;
