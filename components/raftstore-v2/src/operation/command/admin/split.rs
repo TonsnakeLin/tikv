@@ -406,6 +406,7 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
 
         let region = self.region();
         let region_id = region.get_id();
+        let region_was_encrypted = region.get_is_encrypted_region();
         validate_batch_split(req, self.region())?;
 
         let mut boundaries: Vec<&[u8]> = Vec::default();
@@ -415,17 +416,19 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
         }
         boundaries.push(self.region().get_end_key());
 
+        let split_reqs = req.get_splits();
+        let req_encrypt_region = split_reqs.get_encrypt_region();
+        let new_region_cnt = split_reqs.get_requests().len();
+        let new_version = region.get_region_epoch().get_version() + new_region_cnt as u64;
         info!(
             self.logger,
             "split region";
             "region" => ?region,
             "index" => log_index,
             "boundaries" => %KeysInfoFormatter(boundaries.iter()),
+            "region_was_encrypted" => region_was_encrypted,
+            "req_encrypt_region" => req_encrypt_region,
         );
-
-        let split_reqs = req.get_splits();
-        let new_region_cnt = split_reqs.get_requests().len();
-        let new_version = region.get_region_epoch().get_version() + new_region_cnt as u64;
 
         let mut derived_req = SplitRequest::default();
         derived_req.new_region_id = region.id;
@@ -446,6 +449,7 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
                 new_region.set_id(req.get_new_region_id());
                 new_region.set_region_epoch(region.get_region_epoch().to_owned());
                 new_region.mut_region_epoch().set_version(new_version);
+                new_region.set_is_encrypted_region(region_was_encrypted);
                 new_region.set_start_key(start_key.to_vec());
                 new_region.set_end_key(end_key.to_vec());
                 new_region.set_peers(region.get_peers().to_vec().into());
@@ -464,6 +468,11 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
             .collect();
 
         let derived_index = if right_derive { regions.len() - 1 } else { 0 };
+        if req_encrypt_region {
+            regions[derived_index].set_is_encrypted_region(true);
+        } else {
+            regions[derived_index].set_is_encrypted_region(false);
+        }        
 
         // We will create checkpoint of the current tablet for both derived region and
         // split regions. Before the creation, we should flush the writes and remove the
@@ -538,7 +547,7 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
         // Reusing the tablet should not be a problem.
         // TODO: Should we avoid flushing for the old tablet?
         ctx.flush_state = Some(self.flush_state().clone());
-        let tablet = reg.tablet_factory().open_tablet(ctx, &path, false).unwrap();
+        let tablet = reg.tablet_factory().open_tablet(ctx, &path, req_encrypt_region).unwrap();
         self.set_tablet(tablet.clone());
 
         self.region_state_mut()

@@ -398,6 +398,7 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
             tikv_util::box_err!("fp")
         ));
 
+        // TODO: check the source region and current regeion have the same encrypt value.
         info!(
             self.logger,
             "execute CommitMerge";
@@ -410,7 +411,7 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
         let ctx = TabletContext::new(source_region, None);
         let source_tablet = reg
             .tablet_factory()
-            .open_tablet(ctx, &source_path, false)
+            .open_tablet(ctx, &source_path, source_region.get_is_encrypted_region())
             .unwrap_or_else(|e| {
                 slog_panic!(self.logger, "failed to open source checkpoint"; "err" => ?e);
             });
@@ -447,7 +448,7 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
                     "error" => ?e
                 )
             });
-        let tablet = reg.tablet_factory().open_tablet(ctx, &path, false).unwrap();
+        let tablet = reg.tablet_factory().open_tablet(ctx, &path, region.get_is_encrypted_region()).unwrap();
         if let Some(guard) = guard {
             tablet
                 .merge(&[&source_tablet, self.tablet()])

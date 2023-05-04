@@ -122,7 +122,8 @@ where
             let path = registry.tablet_path(region.get_id(), RAFT_INIT_LOG_INDEX);
             let ctx = TabletContext::new(&region, Some(RAFT_INIT_LOG_INDEX));
             // TODO: make follow line can recover from abort.
-            registry.tablet_factory().open_tablet(ctx, &path, false).unwrap();
+            // TODO: if region.get_is_encrypted_region() is true, key_manager must exist.
+            registry.tablet_factory().open_tablet(ctx, &path, region.get_is_encrypted_region()).unwrap();
         }
 
         // Put store only if the cluster is bootstrapped.
