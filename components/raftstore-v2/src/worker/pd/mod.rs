@@ -124,8 +124,8 @@ impl Display for Task {
             Task::AskBatchSplit {
                 ref region,
                 ref split_keys,
-                ..,
                 ref encrypt_region,
+                ..
             } => write!(
                 f,
                 "ask split region {} with {}, encrypt_region flag is {}",

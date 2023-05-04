@@ -155,6 +155,7 @@ where
                         split_info.peer,
                         true,
                         None,
+                        false,
                     );
                 // Try to split the region on half within the given key
                 // range if there is no `split_key` been given.
