@@ -243,6 +243,11 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
         self.region().get_id()
     }
 
+    #[inline]
+    pub fn is_encrypted_region(&self) -> bool {
+        self.region().get_is_encrypted_region()
+    }
+
     /// Set the region of a peer.
     ///
     /// This will update the region of the peer, caller must ensure the region

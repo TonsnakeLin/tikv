@@ -214,6 +214,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
         ctx: &StoreContext<EK, ER, T>,
         split_keys: Vec<Vec<u8>>,
         ch: CmdResChannel,
+        encrypt_region: bool,
     ) {
         let task = pd::Task::AskBatchSplit {
             region: self.region().clone(),
@@ -221,6 +222,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
             peer: self.peer().clone(),
             right_derive: ctx.cfg.right_derive_when_split,
             ch,
+            encrypt_region,
         };
         if let Err(e) = ctx.schedulers.pd.schedule(task) {
             error!(

@@ -66,6 +66,7 @@ pub enum Task {
         peer: metapb::Peer,
         right_derive: bool,
         ch: CmdResChannel,
+        encrypt_region: bool,
     },
     ReportBatchSplit {
         regions: Vec<metapb::Region>,
@@ -123,12 +124,14 @@ impl Display for Task {
             Task::AskBatchSplit {
                 ref region,
                 ref split_keys,
-                ..
+                ..,
+                ref encrypt_region,
             } => write!(
                 f,
-                "ask split region {} with {}",
+                "ask split region {} with {}, encrypt_region flag is {}",
                 region.get_id(),
-                KeysInfoFormatter(split_keys.iter())
+                KeysInfoFormatter(split_keys.iter()),
+                encrypt_region,
             ),
             Task::ReportBatchSplit { ref regions } => write!(f, "report split {:?}", regions),
             Task::AutoSplit { ref split_infos } => {
@@ -276,7 +279,8 @@ where
                 peer,
                 right_derive,
                 ch,
-            } => self.handle_ask_batch_split(region, split_keys, peer, right_derive, ch),
+                encrypt_region,
+            } => self.handle_ask_batch_split(region, split_keys, peer, right_derive, ch, encrypt_region),
             Task::ReportBatchSplit { regions } => self.handle_report_batch_split(regions),
             Task::AutoSplit { split_infos } => self.handle_auto_split(split_infos),
             Task::UpdateMaxTimestamp {

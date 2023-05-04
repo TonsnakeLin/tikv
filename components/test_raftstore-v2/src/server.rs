@@ -226,9 +226,10 @@ impl<EK: KvEngine> RaftExtension for TestExtension<EK> {
         region_epoch: metapb::RegionEpoch,
         split_keys: Vec<Vec<u8>>,
         source: String,
+        encrypt: bool,
     ) -> futures::future::BoxFuture<'static, storage::kv::Result<Vec<metapb::Region>>> {
         self.extension
-            .split(region_id, region_epoch, split_keys, source)
+            .split(region_id, region_epoch, split_keys, source, encrypt)
     }
 
     fn query_region(

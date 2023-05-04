@@ -17,6 +17,7 @@ fn new_batch_split_region_request(
     split_keys: Vec<Vec<u8>>,
     ids: Vec<pdpb::SplitId>,
     right_derive: bool,
+    _encrypt_region: bool,
 ) -> AdminRequest {
     let mut req = AdminRequest::default();
     req.set_cmd_type(AdminCmdType::BatchSplit);
@@ -47,6 +48,7 @@ where
         peer: metapb::Peer,
         right_derive: bool,
         ch: CmdResChannel,
+        encrypt_region: bool,
     ) {
         Self::ask_batch_split_imp(
             &self.pd_client,
@@ -58,6 +60,7 @@ where
             peer,
             right_derive,
             Some(ch),
+            encrypt_region,
         );
     }
 
@@ -71,7 +74,9 @@ where
         peer: metapb::Peer,
         right_derive: bool,
         ch: Option<CmdResChannel>,
+        encrypt_region :bool,
     ) {
+        // todo: check if encrypt_region is set to true, right_derive must be true.
         if split_keys.is_empty() {
             info!(
                 logger,
@@ -98,6 +103,7 @@ where
                         split_keys,
                         resp.take_ids().into(),
                         right_derive,
+                        encrypt_region,
                     );
                     let region_id = region.get_id();
                     let epoch = region.take_region_epoch();

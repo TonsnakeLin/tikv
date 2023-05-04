@@ -288,6 +288,7 @@ where
                                     epoch,
                                     split_keys: split_region.take_keys().into(),
                                     source: "pd".into(),
+                                    encrypt: false, // todo: get flag from region or peer.
                                 },
                                 ch,
                             }

@@ -280,6 +280,7 @@ impl PeerMsg {
         epoch: metapb::RegionEpoch,
         split_keys: Vec<Vec<u8>>,
         source: String,
+        encrypt: bool,
     ) -> (Self, CmdResSubscriber) {
         let (ch, sub) = CmdResChannel::pair();
         (
@@ -288,6 +289,7 @@ impl PeerMsg {
                     epoch,
                     split_keys,
                     source: source.into(),
+                    encrypt,
                 },
                 ch,
             },

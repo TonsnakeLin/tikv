@@ -147,6 +147,7 @@ pub struct RequestSplit {
     pub epoch: RegionEpoch,
     pub split_keys: Vec<Vec<u8>>,
     pub source: Cow<'static, str>,
+    pub encrypt: bool,
 }
 
 #[derive(Debug)]
@@ -298,7 +299,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
             ch.set_result(cmd_resp::new_error(e));
             return;
         }
-        self.ask_batch_split_pd(ctx, rs.split_keys, ch);
+        self.ask_batch_split_pd(ctx, rs.split_keys, ch, rs.encrypt);
     }
 
     pub fn on_request_half_split<T>(
