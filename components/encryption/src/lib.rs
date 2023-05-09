@@ -35,6 +35,8 @@ const TRASH_PREFIX: &str = "TRASH-";
 /// Remove a directory.
 ///
 /// Rename it before actually removal.
+/// we don't add the flag `is_encrypted`, because if the file was not encrypted,
+/// it didn't write anything to file.dict.
 #[inline]
 pub fn trash_dir_all(
     path: impl AsRef<Path>,
@@ -56,7 +58,7 @@ pub fn trash_dir_all(
             return Ok(());
         }
         return Err(e);
-    } else if let Some(m) = key_manager {
+    } else if is_encrypted && let Some(m) = key_manager {
         m.remove_dir(path, Some(&trash_path))?;
     }
     file_system::remove_dir_all(trash_path)

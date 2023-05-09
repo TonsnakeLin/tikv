@@ -442,6 +442,7 @@ impl<EK: KvEngine, ER: RaftEngine> Storage<EK, ER> {
             return;
         }
         let region_id = self.region().get_id();
+        let is_encrypted = self.region().get_is_encrypted_region();
         let target_path = registry.tablet_path(region_id, tablet_index);
         if target_path.exists() {
             // Move data succeeded before restart, nothing to recover.
@@ -450,7 +451,7 @@ impl<EK: KvEngine, ER: RaftEngine> Storage<EK, ER> {
         if tablet_index == RAFT_INIT_LOG_INDEX {
             // Its data may come from split or snapshot. Try split first.
             let split_path = temp_split_path(registry, region_id);
-            if install_tablet(registry, key_manager, &split_path, region_id, tablet_index) {
+            if install_tablet(registry, key_manager, &split_path, region_id, tablet_index, is_encrypted) {
                 return;
             }
         }
@@ -465,7 +466,7 @@ impl<EK: KvEngine, ER: RaftEngine> Storage<EK, ER> {
                 self.entry_storage().truncated_term(),
                 tablet_index,
             );
-            if install_tablet(registry, key_manager, &snap_path, region_id, tablet_index) {
+            if install_tablet(registry, key_manager, &snap_path, region_id, tablet_index, is_encrypted) {
                 return;
             }
         }

@@ -120,7 +120,7 @@ impl<EK: KvEngine, ER: RaftEngine, N: AsyncReadNotifier> ReadRunner<EK, ER, N> {
         self.sanp_mgr.as_ref().unwrap()
     }
 
-    fn generate_snap(&self, snap_key: &TabletSnapKey, tablet: EK) -> crate::Result<()> {
+    fn generate_snap(&self, snap_key: &TabletSnapKey, tablet: EK, _is_encrypted: bool) -> crate::Result<()> {
         let checkpointer_path = self.snap_mgr().tablet_gen_path(snap_key);
         if checkpointer_path.exists() {
             // TODO: make `delete_snapshot` return error so we can use it here.
@@ -212,6 +212,7 @@ where
                 });
                 // the state should already checked in apply workers.
                 assert_ne!(region_state.get_state(), PeerState::Tombstone);
+                let is_encrypted = region_state.get_region().get_is_encrypted_region();
                 let mut snapshot = Snapshot::default();
                 // Set snapshot metadata.
                 snapshot.mut_metadata().set_term(last_applied_term);
@@ -232,7 +233,7 @@ where
                 let mut res = None;
                 let total_size = tablet.get_engine_used_size().unwrap_or(0);
                 let total_keys = tablet.get_num_keys().unwrap_or(0);
-                if let Err(e) = self.generate_snap(&snap_key, tablet) {
+                if let Err(e) = self.generate_snap(&snap_key, tablet, is_encrypted) {
                     error!("failed to create checkpointer"; "region_id" => region_id, "error" => %e);
                     SNAP_COUNTER.generate.fail.inc();
                 } else {

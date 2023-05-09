@@ -144,6 +144,7 @@ pub fn install_tablet<EK: KvEngine>(
     source: &Path,
     region_id: u64,
     tablet_index: u64,
+    is_encrypted_region: bool,
 ) -> bool {
     if !source.exists() {
         return false;
@@ -156,7 +157,7 @@ pub fn install_tablet<EK: KvEngine>(
         source.display(),
         target_path.display()
     );
-    if let Some(m) = &key_manager {
+    if is_encrypted_region && let Some(m) = &key_manager {
         m.link_file(source.to_str().unwrap(), target_path.to_str().unwrap())
             .unwrap();
     }
@@ -171,7 +172,7 @@ pub fn install_tablet<EK: KvEngine>(
             e
         );
     }
-    if let Some(m) = &key_manager {
+    if is_encrypted_region && let Some(m) = &key_manager {
         m.delete_file(source.to_str().unwrap()).unwrap();
     }
     true
@@ -565,6 +566,7 @@ impl<EK: KvEngine, ER: RaftEngine> Storage<EK, ER> {
     ) -> Result<()> {
         let region_id = self.region().get_id();
         let peer_id = self.peer().get_id();
+        let is_encrypted = self.region().get_is_encrypted_region();
         info!(
             self.logger(),
             "begin to apply snapshot";
@@ -662,7 +664,7 @@ impl<EK: KvEngine, ER: RaftEngine> Storage<EK, ER> {
         let reg = reg.clone();
         let key_manager = key_manager.cloned();
         let hook = move || {
-            if !install_tablet(&reg, key_manager.as_deref(), &path, region_id, last_index) {
+            if !install_tablet(&reg, key_manager.as_deref(), &path, region_id, last_index, is_encrypted) {
                 slog_panic!(
                     logger,
                     "failed to install tablet";
