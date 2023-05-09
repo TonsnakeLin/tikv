@@ -58,7 +58,7 @@ pub fn trash_dir_all(
             return Ok(());
         }
         return Err(e);
-    } else if is_encrypted && let Some(m) = key_manager {
+    } else if let Some(m) = key_manager {
         m.remove_dir(path, Some(&trash_path))?;
     }
     file_system::remove_dir_all(trash_path)
