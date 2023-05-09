@@ -441,7 +441,7 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
             derived_req.iter().chain(split_reqs.get_requests())
         };
 
-        let regions: Vec<_> = boundaries
+        let mut regions: Vec<_> = boundaries
             .array_windows::<2>()
             .zip(reqs)
             .map(|([start_key, end_key], req)| {
