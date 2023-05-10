@@ -490,7 +490,7 @@ mod tests {
         let factory = Box::new(TestTabletFactory::new(ops, cf_opts));
         let reg = TabletRegistry::new(factory, path.path().join("tablets")).unwrap();
         let tablet_ctx = TabletContext::new(&region, Some(10));
-        reg.load(tablet_ctx, true).unwrap();
+        reg.load(tablet_ctx, true, false).unwrap();
         // setup read runner worker and peer storage
         let mut worker = Worker::new("test-read-worker").lazy_build("test-read-worker");
         let sched = worker.scheduler();

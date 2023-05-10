@@ -450,7 +450,7 @@ mod tests {
         region.set_start_key(b"a".to_vec());
         region.set_end_key(b"b".to_vec());
         let tablet = registry
-            .load(TabletContext::new(&region, Some(1)), true)
+            .load(TabletContext::new(&region, Some(1)), true, false)
             .unwrap()
             .latest()
             .unwrap()
@@ -465,7 +465,7 @@ mod tests {
         region.set_start_key(b"c".to_vec());
         region.set_end_key(b"d".to_vec());
         let tablet = registry
-            .load(TabletContext::new(&region, Some(1)), true)
+            .load(TabletContext::new(&region, Some(1)), true, false)
             .unwrap()
             .latest()
             .unwrap()
