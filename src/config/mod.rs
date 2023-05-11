@@ -1428,6 +1428,7 @@ impl DbConfig {
                 opts.set_env(shared.env.0.as_ref().unwrap().clone());
                 // todo: check env.0 is encrption env
             } else {
+                // maybe we should use plaitext env, but we can't judge it correctly.
                 opts.set_env(shared.env.1.as_ref().unwrap().clone());
             }
         } else {
