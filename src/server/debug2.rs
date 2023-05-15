@@ -568,8 +568,9 @@ fn get_tablet_cache(
         Ok(tablet_cache)
     } else {
         let region_state = state.unwrap();
+        let is_encrypted = region_state.get_region().get_is_encrypted_region();
         let ctx = TabletContext::new(region_state.get_region(), Some(region_state.tablet_index));
-        match tablet_reg.load(ctx, false) {
+        match tablet_reg.load(ctx, false, is_encrypted) {
             Ok(tablet_cache) => Ok(tablet_cache),
             Err(e) => {
                 println!(
