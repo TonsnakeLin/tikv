@@ -665,7 +665,7 @@ mod tests {
         state.set_tablet_index(5);
 
         let ctx = TabletContext::new(&region, Some(5));
-        let mut tablet_cache = debugger.tablet_reg.load(ctx, true).unwrap();
+        let mut tablet_cache = debugger.tablet_reg.load(ctx, true, false).unwrap();
         let tablet = tablet_cache.latest().unwrap();
 
         let mut wb = raft_engine.log_batch(10);
@@ -768,7 +768,7 @@ mod tests {
         state.set_tablet_index(5);
 
         let ctx = TabletContext::new(&region, Some(5));
-        let mut tablet_cache = debugger.tablet_reg.load(ctx, true).unwrap();
+        let mut tablet_cache = debugger.tablet_reg.load(ctx, true, false).unwrap();
         let tablet = tablet_cache.latest().unwrap();
 
         let mut wb = raft_engine.log_batch(10);

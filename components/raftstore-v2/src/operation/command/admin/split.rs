@@ -67,6 +67,9 @@ use crate::{
 
 pub const SPLIT_PREFIX: &str = "split";
 
+pub const SPLIT_DERIVED_REGION_ENCRYPTED: u16 = 0x0001;
+pub const SPLIT_REQUEST_FROM_TIDB_CREATE_TABLE: u16 = 0x8000;
+
 #[derive(Debug)]
 pub struct SplitResult {
     pub regions: Vec<Region>,
@@ -146,7 +149,7 @@ pub struct RequestSplit {
     pub epoch: RegionEpoch,
     pub split_keys: Vec<Vec<u8>>,
     pub source: Cow<'static, str>,
-    pub encrypt: bool,
+    pub encrypt: u16,
 }
 
 #[derive(Debug)]
@@ -416,7 +419,7 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
         boundaries.push(self.region().get_end_key());
 
         let split_reqs = req.get_splits();
-        let req_encrypt_region = split_reqs.get_encrypt_region();
+        let req_encrypt_flag = split_reqs.get_encrypt_region();
         let new_region_cnt = split_reqs.get_requests().len();
         let new_version = region.get_region_epoch().get_version() + new_region_cnt as u64;
         info!(
@@ -466,12 +469,17 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
             })
             .collect();
 
+        // If the split-region request comes from tidb-server creating table, 
+        // the encryption flag in `region` is dependended by the request encryption flag.
         let derived_index = if right_derive { regions.len() - 1 } else { 0 };
-        if req_encrypt_region {
-            regions[derived_index].set_is_encrypted_region(true);
-        } else {
-            regions[derived_index].set_is_encrypted_region(false);
-        }        
+        if req_encrypt_flag & SPLIT_REQUEST_FROM_TIDB_CREATE_TABLE {
+            if req_encrypt_flag & SPLIT_DERIVED_REGION_ENCRYPTED {
+                regions[derived_index].set_is_encrypted_region(true);
+            } else {
+                regions[derived_index].set_is_encrypted_region(false);
+            }
+            
+        }
 
         // We will create checkpoint of the current tablet for both derived region and
         // split regions. Before the creation, we should flush the writes and remove the

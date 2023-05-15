@@ -66,7 +66,7 @@ pub enum Task {
         peer: metapb::Peer,
         right_derive: bool,
         ch: CmdResChannel,
-        encrypt_region: bool,
+        encrypt_region: u16,
     },
     ReportBatchSplit {
         regions: Vec<metapb::Region>,

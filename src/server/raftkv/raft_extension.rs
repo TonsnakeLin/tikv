@@ -114,7 +114,7 @@ where
         region_epoch: RegionEpoch,
         split_keys: Vec<Vec<u8>>,
         source: String,
-        _encrypt: bool,
+        _encrypt: u16,
     ) -> BoxFuture<'static, kv::Result<Vec<Region>>> {
         let (cb, rx) = paired_future_callback();
         let req = CasualMessage::SplitRegion {

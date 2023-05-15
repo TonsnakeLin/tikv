@@ -70,7 +70,7 @@ impl<EK: KvEngine, ER: RaftEngine> tikv_kv::RaftExtension for Extension<EK, ER> 
         region_epoch: kvproto::metapb::RegionEpoch,
         split_keys: Vec<Vec<u8>>,
         source: String,
-        encrypt: bool,
+        encrypt: u16,
     ) -> futures::future::BoxFuture<'static, tikv_kv::Result<Vec<kvproto::metapb::Region>>> {
         let (msg, sub) = PeerMsg::request_split(region_epoch, 
             split_keys, source, encrypt);
