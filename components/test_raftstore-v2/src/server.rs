@@ -20,7 +20,7 @@ use grpcio::{ChannelBuilder, EnvBuilder, Environment, Error as GrpcError, Servic
 use grpcio_health::HealthService;
 use kvproto::{
     deadlock_grpc::create_deadlock,
-    debugpb_grpc::DebugClient,
+    debugpb_grpc::{create_debug, DebugClient},
     diagnosticspb_grpc::create_diagnostics,
     import_sstpb_grpc::create_import_sst,
     kvrpcpb::{ApiVersion, Context},
@@ -48,14 +48,20 @@ use tempfile::TempDir;
 use test_pd_client::TestPdClient;
 use test_raftstore::{filter_send, AddressMap, Config, Filter};
 use tikv::{
+    config::ConfigController,
     coprocessor, coprocessor_v2,
     import::{ImportSstService, SstImporter},
     read_pool::ReadPool,
     server::{
-        gc_worker::GcWorker, load_statistics::ThreadLoadPool, lock_manager::LockManager,
-        raftkv::ReplicaReadLockChecker, resolve, service::DiagnosticsService, ConnectionBuilder,
-        Error, Extension, NodeV2, PdStoreAddrResolver, RaftClient, RaftKv2, Result as ServerResult,
-        Server, ServerTransport,
+        debug2::DebuggerImplV2,
+        gc_worker::GcWorker,
+        load_statistics::ThreadLoadPool,
+        lock_manager::LockManager,
+        raftkv::ReplicaReadLockChecker,
+        resolve,
+        service::{DebugService, DiagnosticsService},
+        ConnectionBuilder, Error, Extension, NodeV2, PdStoreAddrResolver, RaftClient, RaftKv2,
+        Result as ServerResult, Server, ServerTransport,
     },
     storage::{
         self,
@@ -73,7 +79,7 @@ use tikv_util::{
     worker::{Builder as WorkerBuilder, LazyWorker},
     Either, HandyRwLock,
 };
-use tokio::runtime::Builder as TokioBuilder;
+use tokio::runtime::{Builder as TokioBuilder, Handle};
 use txn_types::TxnExtraScheduler;
 
 use crate::{Cluster, RaftStoreRouter, SimulateTransport, Simulator, SnapshotRouter};
@@ -247,10 +253,12 @@ pub struct ServerMeta<EK: KvEngine> {
     sim_trans: SimulateServerTransport<EK>,
     raw_router: StoreRouter<EK, RaftTestEngine>,
     gc_worker: GcWorker<TestRaftKv2<EK>>,
+    rts_worker: Option<LazyWorker<resolved_ts::Task>>,
     rsmeter_cleanup: Box<dyn FnOnce()>,
 }
 
 type PendingServices = Vec<Box<dyn Fn() -> Service>>;
+type PendingDebugService<EK> = Box<dyn Fn(&ServerCluster<EK>, Handle) -> Service>;
 
 pub struct ServerCluster<EK: KvEngine> {
     metas: HashMap<u64, ServerMeta<EK>>,
@@ -265,6 +273,9 @@ pub struct ServerCluster<EK: KvEngine> {
     concurrency_managers: HashMap<u64, ConcurrencyManager>,
     env: Arc<Environment>,
     pub pending_services: HashMap<u64, PendingServices>,
+    // This is used to work around that server cluster is generic over KvEngine while the debug
+    // service implementation is specific overal RocksDB.
+    pub pending_debug_service: Option<PendingDebugService<EK>>,
     pub health_services: HashMap<u64, HealthService>,
     pub security_mgr: Arc<SecurityManager>,
     pub txn_extra_schedulers: HashMap<u64, Arc<dyn TxnExtraScheduler>>,
@@ -303,6 +314,7 @@ impl<EK: KvEngine> ServerCluster<EK> {
             snap_mgrs: HashMap::default(),
             snap_paths: HashMap::default(),
             pending_services: HashMap::default(),
+            pending_debug_service: None::<PendingDebugService<EK>>,
             health_services: HashMap::default(),
             raft_clients: HashMap::default(),
             conn_builder,
@@ -418,7 +430,30 @@ impl<EK: KvEngine> ServerCluster<EK> {
         );
         gc_worker.start(node_id).unwrap();
 
-        // todo: resolved ts
+        let rts_worker = if cfg.resolved_ts.enable {
+            // Resolved ts worker
+            let mut rts_worker = LazyWorker::new("resolved-ts");
+            let rts_ob = resolved_ts::Observer::new(rts_worker.scheduler());
+            rts_ob.register_to(&mut coprocessor_host);
+            // resolved ts endpoint needs store id.
+            store_meta.lock().unwrap().store_id = node_id;
+            // Resolved ts endpoint
+            let rts_endpoint = resolved_ts::Endpoint::new(
+                &cfg.resolved_ts,
+                rts_worker.scheduler(),
+                raft_router.clone(),
+                store_meta.clone(),
+                self.pd_client.clone(),
+                concurrency_manager.clone(),
+                self.env.clone(),
+                self.security_mgr.clone(),
+            );
+            // Start the worker
+            rts_worker.start(rts_endpoint);
+            Some(rts_worker)
+        } else {
+            None
+        };
 
         if ApiVersion::V2 == F::TAG {
             let casual_ts_provider: Arc<CausalTsProviderImpl> = Arc::new(
@@ -533,7 +568,7 @@ impl<EK: KvEngine> ServerCluster<EK> {
         );
         let debug_thread_handle = debug_thread_pool.handle().clone();
         let diag_service = DiagnosticsService::new(
-            debug_thread_handle,
+            debug_thread_handle.clone(),
             cfg.log.file.filename.clone(),
             cfg.slow_log_file.clone(),
         );
@@ -566,6 +601,9 @@ impl<EK: KvEngine> ServerCluster<EK> {
                 for fact in svcs {
                     svr.register_service(fact());
                 }
+            }
+            if let Some(debug_service) = &self.pending_debug_service {
+                svr.register_service(debug_service(self, debug_thread_handle.clone()));
             }
             match svr.build_and_bind() {
                 Ok(_) => {
@@ -645,6 +683,7 @@ impl<EK: KvEngine> ServerCluster<EK> {
                 sim_router,
                 gc_worker,
                 sim_trans: simulate_trans,
+                rts_worker,
                 rsmeter_cleanup,
             },
         );
@@ -760,10 +799,10 @@ impl<EK: KvEngine> Simulator<EK> for ServerCluster<EK> {
         if let Some(mut meta) = self.metas.remove(&node_id) {
             meta.server.stop().unwrap();
             meta.node.stop();
-            // // resolved ts worker started, let's stop it
-            // if let Some(worker) = meta.rts_worker {
-            //     worker.stop_worker();
-            // }
+            // resolved ts worker started, let's stop it
+            if let Some(worker) = meta.rts_worker {
+                worker.stop_worker();
+            }
             (meta.rsmeter_cleanup)();
         }
         self.storages.remove(&node_id);
@@ -1004,7 +1043,30 @@ pub fn must_new_cluster_and_debug_client() -> (
     DebugClient,
     u64,
 ) {
-    let (cluster, leader, _) = must_new_cluster_mul(1);
+    let mut cluster = new_server_cluster(0, 1);
+    cluster.create_engines();
+    let region_id = cluster.bootstrap_conf_change();
+
+    {
+        let mut sim = cluster.sim.wl();
+        let tablet_registry = cluster.tablet_registries.get(&1).unwrap().clone();
+        let raft_engine = cluster.raft_engines.get(&1).unwrap().clone();
+        let debugger =
+            DebuggerImplV2::new(tablet_registry, raft_engine, ConfigController::default());
+
+        sim.pending_debug_service = Some(Box::new(move |cluster, debug_thread_handle| {
+            let raft_extension = cluster.storages.get(&1).unwrap().raft_extension();
+
+            create_debug(DebugService::new(
+                debugger.clone(),
+                debug_thread_handle,
+                raft_extension,
+            ))
+        }));
+    }
+
+    cluster.start().unwrap();
+    let leader = cluster.leader_of_region(region_id).unwrap();
 
     let env = Arc::new(Environment::new(1));
     let channel =
@@ -1012,4 +1074,47 @@ pub fn must_new_cluster_and_debug_client() -> (
     let client = DebugClient::new(channel);
 
     (cluster, client, leader.get_store_id())
+}
+
+pub fn setup_cluster() -> (
+    Cluster<ServerCluster<RocksEngine>, RocksEngine>,
+    TikvClient,
+    String,
+    Context,
+) {
+    let mut cluster = new_server_cluster(0, 3);
+    cluster.run();
+
+    let region_id = 1;
+    let leader = cluster.leader_of_region(region_id).unwrap();
+    let leader_addr = cluster.sim.rl().get_addr(leader.get_store_id());
+    let region = cluster.get_region(b"k1");
+    let follower = region
+        .get_peers()
+        .iter()
+        .find(|p| **p != leader)
+        .unwrap()
+        .clone();
+    let follower_addr = cluster.sim.rl().get_addr(follower.get_store_id());
+    let epoch = cluster.get_region_epoch(region_id);
+    let mut ctx = Context::default();
+    ctx.set_region_id(region_id);
+    ctx.set_peer(leader);
+    ctx.set_region_epoch(epoch);
+
+    let env = Arc::new(Environment::new(1));
+    let channel = ChannelBuilder::new(env).connect(&follower_addr);
+    let client = TikvClient::new(channel);
+
+    // Verify not setting forwarding header will result in store not match.
+    let mut put_req = kvproto::kvrpcpb::RawPutRequest::default();
+    put_req.set_context(ctx.clone());
+    let put_resp = client.raw_put(&put_req).unwrap();
+    assert!(
+        put_resp.get_region_error().has_store_not_match(),
+        "{:?}",
+        put_resp
+    );
+    assert!(put_resp.error.is_empty(), "{:?}", put_resp);
+    (cluster, client, leader_addr, ctx)
 }

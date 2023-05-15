@@ -1006,6 +1006,7 @@ impl<E: Engine, L: LockManager, F: KvFormat> Tikv for Service<E, L, F> {
         mut request: CheckLeaderRequest,
         sink: UnarySink<CheckLeaderResponse>,
     ) {
+        let begin_instant = Instant::now();
         let addr = ctx.peer();
         let ts = request.get_ts();
         let leaders = request.take_regions().into();
@@ -1027,6 +1028,10 @@ impl<E: Engine, L: LockManager, F: KvFormat> Tikv for Service<E, L, F> {
                 }
                 return Err(Error::from(e));
             }
+            let elapsed = begin_instant.saturating_elapsed();
+            GRPC_MSG_HISTOGRAM_STATIC
+                .check_leader
+                .observe(elapsed.as_secs_f64());
             ServerResult::Ok(())
         }
         .map_err(move |e| {
@@ -1152,8 +1157,8 @@ fn handle_batch_commands_request<E: Engine, L: LockManager, F: KvFormat>(
                         resource_manager.consume_penalty(resource_control_ctx);
                     }
                     GRPC_RESOURCE_GROUP_COUNTER_VEC
-                    .with_label_values(&[resource_control_ctx.get_resource_group_name()])
-                    .inc();
+                        .with_label_values(&[resource_control_ctx.get_resource_group_name()])
+                        .inc();
                     if batcher.as_mut().map_or(false, |req_batch| {
                         req_batch.can_batch_get(&req)
                     }) {
@@ -1194,8 +1199,8 @@ fn handle_batch_commands_request<E: Engine, L: LockManager, F: KvFormat>(
                         resource_manager.consume_penalty(resource_control_ctx);
                     }
                     GRPC_RESOURCE_GROUP_COUNTER_VEC
-                    .with_label_values(&[resource_control_ctx.get_resource_group_name()])
-                    .inc();
+                        .with_label_values(&[resource_control_ctx.get_resource_group_name()])
+                        .inc();
                     let begin_instant = Instant::now();
                     let source = req.mut_context().take_request_source();
                     let resp = future_copr(copr, Some(peer.to_string()), req)
@@ -1228,8 +1233,8 @@ fn handle_batch_commands_request<E: Engine, L: LockManager, F: KvFormat>(
                         resource_manager.consume_penalty(resource_control_ctx);
                     }
                     GRPC_RESOURCE_GROUP_COUNTER_VEC
-                    .with_label_values(&[resource_control_ctx.get_resource_group_name()])
-                    .inc();
+                        .with_label_values(&[resource_control_ctx.get_resource_group_name()])
+                        .inc();
                     let begin_instant = Instant::now();
                     let source = req.mut_context().take_request_source();
                     let resp = $future_fn($($arg,)* req)
@@ -2019,7 +2024,31 @@ fn future_raw_coprocessor<E: Engine, L: LockManager, F: KvFormat>(
 }
 
 macro_rules! txn_command_future {
-    ($fn_name: ident, $req_ty: ident, $resp_ty: ident, ($req: ident) {$($prelude: stmt)*}; ($v: ident, $resp: ident, $tracker: ident) { $else_branch: expr }) => {
+    ($fn_name: ident, $req_ty: ident, $resp_ty: ident, ($req: ident) {$($prelude: stmt)*}; ($v: ident, $resp: ident, $tracker: ident) $else_branch: block) => {
+        txn_command_future!(inner $fn_name, $req_ty, $resp_ty, ($req) {$($prelude)*}; ($v, $resp, $tracker) {
+            $else_branch
+            GLOBAL_TRACKERS.with_tracker($tracker, |tracker| {
+                tracker.write_scan_detail($resp.mut_exec_details_v2().mut_scan_detail_v2());
+                tracker.write_write_detail($resp.mut_exec_details_v2().mut_write_detail());
+            });
+        });
+    };
+
+    ($fn_name: ident, $req_ty: ident, $resp_ty: ident, ($v: ident, $resp: ident, $tracker: ident) $else_branch: block ) => {
+        txn_command_future!(inner $fn_name, $req_ty, $resp_ty, (req) {}; ($v, $resp, $tracker) {
+            $else_branch
+            GLOBAL_TRACKERS.with_tracker($tracker, |tracker| {
+                tracker.write_scan_detail($resp.mut_exec_details_v2().mut_scan_detail_v2());
+                tracker.write_write_detail($resp.mut_exec_details_v2().mut_write_detail());
+            });
+        });
+    };
+
+    ($fn_name: ident, $req_ty: ident, $resp_ty: ident, ($v: ident, $resp: ident) $else_branch: block ) => {
+        txn_command_future!(inner $fn_name, $req_ty, $resp_ty, (req) {}; ($v, $resp, tracker) { $else_branch });
+    };
+
+    (inner $fn_name: ident, $req_ty: ident, $resp_ty: ident, ($req: ident) {$($prelude: stmt)*}; ($v: ident, $resp: ident, $tracker: ident) $else_branch: block) => {
         fn $fn_name<E: Engine, L: LockManager, F: KvFormat>(
             storage: &Storage<E, L, F>,
             $req: $req_ty,
@@ -2046,31 +2075,21 @@ macro_rules! txn_command_future {
                 if let Some(err) = extract_region_error(&$v) {
                     $resp.set_region_error(err);
                 } else {
-                    $else_branch;
+                    $else_branch
                 }
                 Ok($resp)
             }
         }
     };
-    ($fn_name: ident, $req_ty: ident, $resp_ty: ident, ($v: ident, $resp: ident, $tracker: ident) { $else_branch: expr }) => {
-        txn_command_future!($fn_name, $req_ty, $resp_ty, (req) {}; ($v, $resp, $tracker) { $else_branch });
-    };
-    ($fn_name: ident, $req_ty: ident, $resp_ty: ident, ($v: ident, $resp: ident) { $else_branch: expr }) => {
-        txn_command_future!($fn_name, $req_ty, $resp_ty, (req) {}; ($v, $resp, tracker) { $else_branch });
-    };
 }
 
-txn_command_future!(future_prewrite, PrewriteRequest, PrewriteResponse, (v, resp, tracker) {{
+txn_command_future!(future_prewrite, PrewriteRequest, PrewriteResponse, (v, resp, tracker) {
     if let Ok(v) = &v {
         resp.set_min_commit_ts(v.min_commit_ts.into_inner());
         resp.set_one_pc_commit_ts(v.one_pc_commit_ts.into_inner());
-        GLOBAL_TRACKERS.with_tracker(tracker, |tracker| {
-            tracker.write_scan_detail(resp.mut_exec_details_v2().mut_scan_detail_v2());
-            tracker.write_write_detail(resp.mut_exec_details_v2().mut_write_detail());
-        });
     }
     resp.set_errors(extract_key_errors(v.map(|v| v.locks)).into());
-}});
+});
 txn_command_future!(future_acquire_pessimistic_lock, PessimisticLockRequest, PessimisticLockResponse,
     (req) {
         let mode = req.get_wake_up_mode()
@@ -2101,21 +2120,17 @@ txn_command_future!(future_acquire_pessimistic_lock, PessimisticLockRequest, Pes
                 resp.set_errors(vec![extract_key_error(&e)].into())
             },
         }
-        GLOBAL_TRACKERS.with_tracker(tracker, |tracker| {
-            tracker.write_scan_detail(resp.mut_exec_details_v2().mut_scan_detail_v2());
-            tracker.write_write_detail(resp.mut_exec_details_v2().mut_write_detail());
-        });
     }}
 );
-txn_command_future!(future_pessimistic_rollback, PessimisticRollbackRequest, PessimisticRollbackResponse, (v, resp) {
+txn_command_future!(future_pessimistic_rollback, PessimisticRollbackRequest, PessimisticRollbackResponse, (v, resp, tracker) {
     resp.set_errors(extract_key_errors(v).into())
 });
-txn_command_future!(future_batch_rollback, BatchRollbackRequest, BatchRollbackResponse, (v, resp) {
+txn_command_future!(future_batch_rollback, BatchRollbackRequest, BatchRollbackResponse, (v, resp, tracker) {
     if let Err(e) = v {
         resp.set_error(extract_key_error(&e));
-    }
+    };
 });
-txn_command_future!(future_resolve_lock, ResolveLockRequest, ResolveLockResponse, (v, resp) {
+txn_command_future!(future_resolve_lock, ResolveLockRequest, ResolveLockResponse, (v, resp, tracker) {
     if let Err(e) = v {
         resp.set_error(extract_key_error(&e));
     }
@@ -2124,11 +2139,7 @@ txn_command_future!(future_commit, CommitRequest, CommitResponse, (v, resp, trac
     match v {
         Ok(TxnStatus::Committed { commit_ts }) => {
             resp.set_commit_version(commit_ts.into_inner());
-            GLOBAL_TRACKERS.with_tracker(tracker, |tracker| {
-                tracker.write_scan_detail(resp.mut_exec_details_v2().mut_scan_detail_v2());
-                tracker.write_write_detail(resp.mut_exec_details_v2().mut_write_detail());
-            });
-        }
+        },
         Ok(_) => unreachable!(),
         Err(e) => resp.set_error(extract_key_error(&e)),
     }
@@ -2142,7 +2153,7 @@ txn_command_future!(future_cleanup, CleanupRequest, CleanupResponse, (v, resp) {
         }
     }
 });
-txn_command_future!(future_txn_heart_beat, TxnHeartBeatRequest, TxnHeartBeatResponse, (v, resp) {
+txn_command_future!(future_txn_heart_beat, TxnHeartBeatRequest, TxnHeartBeatResponse, (v, resp, tracker) {
     match v {
         Ok(txn_status) => {
             if let TxnStatus::Uncommitted { lock, .. } = txn_status {
@@ -2155,7 +2166,7 @@ txn_command_future!(future_txn_heart_beat, TxnHeartBeatRequest, TxnHeartBeatResp
     }
 });
 txn_command_future!(future_check_txn_status, CheckTxnStatusRequest, CheckTxnStatusResponse,
-    (v, resp) {
+    (v, resp, tracker) {
         match v {
             Ok(txn_status) => match txn_status {
                 TxnStatus::RolledBack => resp.set_action(Action::NoAction),
@@ -2178,7 +2189,7 @@ txn_command_future!(future_check_txn_status, CheckTxnStatusRequest, CheckTxnStat
             Err(e) => resp.set_error(extract_key_error(&e)),
         }
 });
-txn_command_future!(future_check_secondary_locks, CheckSecondaryLocksRequest, CheckSecondaryLocksResponse, (status, resp) {
+txn_command_future!(future_check_secondary_locks, CheckSecondaryLocksRequest, CheckSecondaryLocksResponse, (status, resp, tracker) {
     match status {
         Ok(SecondaryLocksStatus::Locked(locks)) => {
             resp.set_locks(locks.into());
