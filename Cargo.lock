@@ -6745,7 +6745,6 @@ dependencies = [
  "raft-engine-ctl",
  "raft_log_engine",
  "raftstore",
- "raftstore-v2",
  "rand 0.8.5",
  "regex",
  "security",
