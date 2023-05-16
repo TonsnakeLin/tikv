@@ -73,6 +73,7 @@ raft = { version = "0.7.0", default-features = false, features = ["protobuf-code
 raft-engine-ctl = { git = "https://github.com/tikv/raft-engine.git" }
 raft_log_engine = { workspace = true }
 raftstore = { workspace = true }
+raftstore-v2 = { workspace = true }
 rand = "0.8"
 regex = "1"
 security = { workspace = true }

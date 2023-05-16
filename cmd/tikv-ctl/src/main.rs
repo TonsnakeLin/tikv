@@ -604,6 +604,7 @@ fn split_region(pd_client: &RpcClient, mgr: Arc<SecurityManager>, region_id: u64
     req.mut_context()
         .set_region_epoch(region.get_region_epoch().clone());
     req.set_split_key(key);
+    req.set_encrypt(raftstore_v2::operation::SPLIT_REQUEST_FROM_TIKVCTL);
 
     let resp = tikv_client
         .split_region(&req)

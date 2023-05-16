@@ -214,7 +214,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
         ctx: &StoreContext<EK, ER, T>,
         split_keys: Vec<Vec<u8>>,
         ch: CmdResChannel,
-        encrypt_region: u16,
+        encrypt_region: u32,
     ) {
         let task = pd::Task::AskBatchSplit {
             region: self.region().clone(),

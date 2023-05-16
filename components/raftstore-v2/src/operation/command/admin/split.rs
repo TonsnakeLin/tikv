@@ -49,6 +49,7 @@ use raftstore::{
         snap::TABLET_SNAPSHOT_VERSION,
         util::{self, KeysInfoFormatter},
         PeerPessimisticLocks, SplitCheckTask, Transport, RAFT_INIT_LOG_INDEX, RAFT_INIT_LOG_TERM,
+        SPLIT_REQUEST_FROM_TIKV_SPLIT_CHECKER,
     },
     Result,
 };
@@ -67,8 +68,19 @@ use crate::{
 
 pub const SPLIT_PREFIX: &str = "split";
 
-pub const SPLIT_DERIVED_REGION_ENCRYPTED: u16 = 0x0001;
+// bit 15~12, used by tidb-server request
 pub const SPLIT_REQUEST_FROM_TIDB_CREATE_TABLE: u16 = 0x8000;
+// bit 11~8, used by tikv-ctl
+pub const SPLIT_REQUEST_FROM_TIKVCTL: u16 = 0x0800;
+// bit 7~4, used by pd
+pub const SPLIT_REQUEST_FROM_PD_HEARTBEAT: u16 = 0x0080;
+// bit 3~1, used by tikv
+pub const SPLIT_REQUEST_FROM_TIKV_AUTOSPLIT: u16 = 0x0008;
+// SPLIT_REQUEST_FROM_TIKV_SPLIT_CHECKER is defined in store::SPLIT_REQUEST_FROM_TIKV_SPLIT_CHECKER
+// pub const SPLIT_REQUEST_FROM_TIKV_SPLIT_CHECKER: u16 = 0x0004;
+
+// bit0, used by tidb-server, indicate that whether ther derived region needs to be encrypted
+pub const SPLIT_DERIVED_REGION_ENCRYPTED: u16 = 0x0001;
 
 #[derive(Debug)]
 pub struct SplitResult {
@@ -149,7 +161,7 @@ pub struct RequestSplit {
     pub epoch: RegionEpoch,
     pub split_keys: Vec<Vec<u8>>,
     pub source: Cow<'static, str>,
-    pub encrypt: u16,
+    pub encrypt: u32,
 }
 
 #[derive(Debug)]

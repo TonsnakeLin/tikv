@@ -11,13 +11,13 @@ use slog::{info, warn, Logger};
 use yatp::{task::future::TaskCell, Remote};
 
 use super::{requests::*, Runner};
-use crate::{batch::StoreRouter, router::CmdResChannel};
+use crate::{batch::StoreRouter, router::CmdResChannel, operation::SPLIT_REQUEST_FROM_TIKV_AUTOSPLIT};
 
 fn new_batch_split_region_request(
     split_keys: Vec<Vec<u8>>,
     ids: Vec<pdpb::SplitId>,
     right_derive: bool,
-    encrypt_region: u16,
+    encrypt_region: u32,
 ) -> AdminRequest {
     let mut req = AdminRequest::default();
     req.set_cmd_type(AdminCmdType::BatchSplit);
@@ -49,7 +49,7 @@ where
         peer: metapb::Peer,
         right_derive: bool,
         ch: CmdResChannel,
-        encrypt_region: u16,
+        encrypt_region: u32,
     ) {
         Self::ask_batch_split_imp(
             &self.pd_client,
@@ -75,7 +75,7 @@ where
         peer: metapb::Peer,
         right_derive: bool,
         ch: Option<CmdResChannel>,
-        encrypt_region :u16,
+        encrypt_region :u32,
     ) {
         // todo: check if encrypt_region is set to true, right_derive must be true.
         if split_keys.is_empty() {
@@ -157,7 +157,7 @@ where
                         split_info.peer,
                         true,
                         None,
-                        encrypted,
+                        SPLIT_REQUEST_FROM_TIKV_AUTOSPLIT,
                     );
                 // Try to split the region on half within the given key
                 // range if there is no `split_key` been given.

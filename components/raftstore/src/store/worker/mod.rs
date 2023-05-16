@@ -43,6 +43,7 @@ pub use self::{
     region::{Runner as RegionRunner, Task as RegionTask},
     split_check::{
         Bucket, BucketRange, KeyEntry, Runner as SplitCheckRunner, Task as SplitCheckTask,
+        SPLIT_REQUEST_FROM_TIKV_SPLIT_CHECKER,
     },
     split_config::{
         SplitConfig, SplitConfigManager, BIG_REGION_CPU_OVERLOAD_THRESHOLD_RATIO,

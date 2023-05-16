@@ -31,6 +31,8 @@ use crate::{
     Result,
 };
 
+pub const SPLIT_REQUEST_FROM_TIKV_SPLIT_CHECKER: uint32 = 0x0004;
+
 #[derive(PartialEq, Eq)]
 pub struct KeyEntry {
     key: Vec<u8>,
@@ -484,7 +486,7 @@ impl<EK: KvEngine, S: StoreHandle> Runner<EK, S> {
         if !split_keys.is_empty() {
             let region_epoch = region.get_region_epoch().clone();
             self.router
-                .ask_split(region_id, region_epoch, split_keys, "split checker".into());
+                .ask_split(region_id, region_epoch, split_keys, "split checker".into(), SPLIT_REQUEST_FROM_TIKV_SPLIT_CHECKER);
             CHECK_SPILT_COUNTER.success.inc();
         } else {
             debug!(

@@ -13,7 +13,7 @@ use tikv_util::{store::QueryStats, time::UnixSecs};
 
 use super::{requests::*, Runner};
 use crate::{
-    operation::{RequestHalfSplit, RequestSplit},
+    operation::{RequestHalfSplit, RequestSplit, SPLIT_REQUEST_FROM_PD_HEARTBEAT},
     router::{CmdResChannel, PeerMsg},
 };
 
@@ -288,7 +288,7 @@ where
                                     epoch,
                                     split_keys: split_region.take_keys().into(),
                                     source: "pd".into(),
-                                    encrypt: 0x0020, // todo: get flag from region or peer.
+                                    encrypt: SPLIT_REQUEST_FROM_PD_HEARTBEAT, 
                                 },
                                 ch,
                             }

@@ -47,7 +47,7 @@ pub trait RaftExtension: Clone + Send {
         _region_epoch: RegionEpoch,
         _split_keys: Vec<Vec<u8>>,
         _source: String,
-        _encrypt: u16,
+        _encrypt: u32,
     ) -> BoxFuture<'static, Result<Vec<Region>>> {
         Box::pin(async move { Err(box_err!("raft split is not supported")) })
     }

@@ -34,7 +34,8 @@ use slog::{error, info};
 use split::SplitResult;
 pub use split::{
     report_split_init_finish, temp_split_path, RequestHalfSplit, RequestSplit, SplitFlowControl,
-    SplitInit, SPLIT_PREFIX,
+    SplitInit, SPLIT_PREFIX, SPLIT_DERIVED_REGION_ENCRYPTED, SPLIT_REQUEST_FROM_TIDB_CREATE_TABLE,
+    SPLIT_REQUEST_FROM_TIKVCTL, SPLIT_REQUEST_FROM_PD_HEARTBEAT, SPLIT_REQUEST_FROM_TIKV_AUTOSPLIT,
 };
 use tikv_util::{box_err, log::SlogFormat};
 use txn_types::WriteBatchFlags;

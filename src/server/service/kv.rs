@@ -802,7 +802,7 @@ impl<E: Engine, L: LockManager, F: KvFormat> Tikv for Service<E, L, F> {
         let begin_instant = Instant::now();
 
         let region_id = req.get_context().get_region_id();
-        let region_encrpt = req.get_encrypt();
+        let region_encrypt = req.get_encrypt();
         let mut split_keys = if req.is_raw_kv {
             if !req.get_split_key().is_empty() {
                 vec![F::encode_raw_key_owned(req.take_split_key(), None).into_encoded()]
@@ -829,7 +829,7 @@ impl<E: Engine, L: LockManager, F: KvFormat> Tikv for Service<E, L, F> {
             req.take_context().take_region_epoch(),
             split_keys,
             ctx.peer(),
-            region_encrpt,
+            region_encrypt,
         );
 
         let task = async move {

@@ -12,7 +12,8 @@ pub use command::{
     AdminCmdResult, ApplyFlowControl, CatchUpLogs, CommittedEntries, CompactLogContext,
     MergeContext, ProposalControl, RequestHalfSplit, RequestSplit, SimpleWriteBinary,
     SimpleWriteEncoder, SimpleWriteReqDecoder, SimpleWriteReqEncoder, SplitFlowControl,
-    MERGE_IN_PROGRESS_PREFIX, MERGE_SOURCE_PREFIX, SPLIT_PREFIX,
+    MERGE_IN_PROGRESS_PREFIX, MERGE_SOURCE_PREFIX, SPLIT_PREFIX, SPLIT_REQUEST_FROM_TIKVCTL,
+    SPLIT_REQUEST_FROM_PD_HEARTBEAT, SPLIT_REQUEST_FROM_TIKV_AUTOSPLIT,
 };
 pub use life::{AbnormalPeerContext, DestroyProgress, GcPeerContext};
 pub use ready::{
