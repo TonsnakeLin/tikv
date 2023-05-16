@@ -70,6 +70,7 @@ pub const SPLIT_PREFIX: &str = "split";
 // bit 15~12, used by tidb-server request
 pub const SPLIT_REQUEST_FROM_TIDB_CREATE_TABLE: u32 = 0x8000;
 // bit 11~8, used by tikv-ctl
+#[allow(dead_code)]
 pub const SPLIT_REQUEST_FROM_TIKVCTL: u32 = 0x0800;
 // bit 7~4, used by pd
 pub const SPLIT_REQUEST_FROM_PD_HEARTBEAT: u32 = 0x0080;
@@ -483,8 +484,8 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
         // If the split-region request comes from tidb-server creating table, 
         // the encryption flag in `region` is dependended by the request encryption flag.
         let derived_index = if right_derive { regions.len() - 1 } else { 0 };
-        if req_encrypt_flag & SPLIT_REQUEST_FROM_TIDB_CREATE_TABLE == 1 as u32 {
-            if req_encrypt_flag & SPLIT_DERIVED_REGION_ENCRYPTED {
+        if req_encrypt_flag & SPLIT_REQUEST_FROM_TIDB_CREATE_TABLE == 0x8000 as u32 {
+            if req_encrypt_flag & SPLIT_DERIVED_REGION_ENCRYPTED == 0x0001 as u32  {
                 regions[derived_index].set_is_encrypted_region(true);
             } else {
                 regions[derived_index].set_is_encrypted_region(false);

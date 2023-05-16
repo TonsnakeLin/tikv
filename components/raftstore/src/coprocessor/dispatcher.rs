@@ -90,7 +90,7 @@ impl StoreHandle for std::sync::mpsc::SyncSender<SchedTask> {
         region_epoch: RegionEpoch,
         split_keys: Vec<Vec<u8>>,
         source: Cow<'static, str>,
-        encrypt: u32,
+        _encrypt: u32,
     ) {
         let _ = self.try_send(SchedTask::AskSplit {
             region_id,

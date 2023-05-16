@@ -144,7 +144,6 @@ where
             for split_info in split_infos {
                 let Ok(Some(region)) =
                     pd_client.get_region_by_id(split_info.region_id).await else { continue };
-                    let encrypted = region.get_is_encrypted_region();
                 // Try to split the region with the given split key.
                 if let Some(split_key) = split_info.split_key {
                     Self::ask_batch_split_imp(
