@@ -49,7 +49,6 @@ use raftstore::{
         snap::TABLET_SNAPSHOT_VERSION,
         util::{self, KeysInfoFormatter},
         PeerPessimisticLocks, SplitCheckTask, Transport, RAFT_INIT_LOG_INDEX, RAFT_INIT_LOG_TERM,
-        SPLIT_REQUEST_FROM_TIKV_SPLIT_CHECKER,
     },
     Result,
 };
@@ -69,18 +68,18 @@ use crate::{
 pub const SPLIT_PREFIX: &str = "split";
 
 // bit 15~12, used by tidb-server request
-pub const SPLIT_REQUEST_FROM_TIDB_CREATE_TABLE: u16 = 0x8000;
+pub const SPLIT_REQUEST_FROM_TIDB_CREATE_TABLE: u32 = 0x8000;
 // bit 11~8, used by tikv-ctl
-pub const SPLIT_REQUEST_FROM_TIKVCTL: u16 = 0x0800;
+pub const SPLIT_REQUEST_FROM_TIKVCTL: u32 = 0x0800;
 // bit 7~4, used by pd
-pub const SPLIT_REQUEST_FROM_PD_HEARTBEAT: u16 = 0x0080;
+pub const SPLIT_REQUEST_FROM_PD_HEARTBEAT: u32 = 0x0080;
 // bit 3~1, used by tikv
-pub const SPLIT_REQUEST_FROM_TIKV_AUTOSPLIT: u16 = 0x0008;
+pub const SPLIT_REQUEST_FROM_TIKV_AUTOSPLIT: u32 = 0x0008;
 // SPLIT_REQUEST_FROM_TIKV_SPLIT_CHECKER is defined in store::SPLIT_REQUEST_FROM_TIKV_SPLIT_CHECKER
 // pub const SPLIT_REQUEST_FROM_TIKV_SPLIT_CHECKER: u16 = 0x0004;
 
 // bit0, used by tidb-server, indicate that whether ther derived region needs to be encrypted
-pub const SPLIT_DERIVED_REGION_ENCRYPTED: u16 = 0x0001;
+pub const SPLIT_DERIVED_REGION_ENCRYPTED: u32 = 0x0001;
 
 #[derive(Debug)]
 pub struct SplitResult {
@@ -441,7 +440,7 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
             "index" => log_index,
             "boundaries" => %KeysInfoFormatter(boundaries.iter()),
             "region_was_encrypted" => region_was_encrypted,
-            "req_encrypt_region" => req_encrypt_region,
+            "req_encrypt_flag" => req_encrypt_flag,
         );
 
         let mut derived_req = SplitRequest::default();
@@ -484,14 +483,14 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
         // If the split-region request comes from tidb-server creating table, 
         // the encryption flag in `region` is dependended by the request encryption flag.
         let derived_index = if right_derive { regions.len() - 1 } else { 0 };
-        if req_encrypt_flag & SPLIT_REQUEST_FROM_TIDB_CREATE_TABLE {
+        if req_encrypt_flag & SPLIT_REQUEST_FROM_TIDB_CREATE_TABLE == 1 as u32 {
             if req_encrypt_flag & SPLIT_DERIVED_REGION_ENCRYPTED {
                 regions[derived_index].set_is_encrypted_region(true);
             } else {
                 regions[derived_index].set_is_encrypted_region(false);
-            }
-            
+            }            
         }
+        let req_encrypt_region = regions[derived_index].get_is_encrypted_region();
 
         // We will create checkpoint of the current tablet for both derived region and
         // split regions. Before the creation, we should flush the writes and remove the
