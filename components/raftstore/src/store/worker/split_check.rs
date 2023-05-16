@@ -31,7 +31,7 @@ use crate::{
     Result,
 };
 
-pub const SPLIT_REQUEST_FROM_TIKV_SPLIT_CHECKER: uint32 = 0x0004;
+pub const SPLIT_REQUEST_FROM_TIKV_SPLIT_CHECKER: u32 = 0x0004;
 
 #[derive(PartialEq, Eq)]
 pub struct KeyEntry {

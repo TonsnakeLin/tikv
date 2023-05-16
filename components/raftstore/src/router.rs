@@ -322,7 +322,7 @@ impl<EK: KvEngine, ER: RaftEngine> crate::coprocessor::StoreHandle for RaftRoute
         region_epoch: metapb::RegionEpoch,
         split_keys: Vec<Vec<u8>>,
         source: Cow<'static, str>,
-        _encrypt: uint32,
+        _encrypt: u32,
     ) {
         if let Err(e) = CasualRouter::send(
             self,
