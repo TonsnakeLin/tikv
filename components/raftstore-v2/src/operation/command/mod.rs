@@ -67,7 +67,7 @@ mod write;
 pub use admin::{
     report_split_init_finish, temp_split_path, AdminCmdResult, CatchUpLogs, CompactLogContext,
     MergeContext, RequestHalfSplit, RequestSplit, SplitFlowControl, SplitInit,
-    MERGE_IN_PROGRESS_PREFIX, MERGE_SOURCE_PREFIX, SPLIT_PREFIX, SPLIT_REQUEST_FROM_TIKVCTL,
+    MERGE_IN_PROGRESS_PREFIX, MERGE_SOURCE_PREFIX, SPLIT_PREFIX,
     SPLIT_REQUEST_FROM_PD_HEARTBEAT, SPLIT_REQUEST_FROM_TIKV_AUTOSPLIT,
 };
 pub use control::ProposalControl;

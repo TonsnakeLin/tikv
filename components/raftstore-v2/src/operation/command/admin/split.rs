@@ -70,8 +70,8 @@ pub const SPLIT_PREFIX: &str = "split";
 // bit 15~12, used by tidb-server request
 pub const SPLIT_REQUEST_FROM_TIDB_CREATE_TABLE: u32 = 0x8000;
 // bit 11~8, used by tikv-ctl
-#[allow(dead_code)]
-pub const SPLIT_REQUEST_FROM_TIKVCTL: u32 = 0x0800;
+// SPLIT_REQUEST_FROM_TIKVCTL is defined in tikv-ctl
+// pub const SPLIT_REQUEST_FROM_TIKVCTL: u32 = 0x0800;
 // bit 7~4, used by pd
 pub const SPLIT_REQUEST_FROM_PD_HEARTBEAT: u32 = 0x0080;
 // bit 3~1, used by tikv

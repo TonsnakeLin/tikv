@@ -51,6 +51,8 @@ use txn_types::Key;
 
 use crate::{cmd::*, executor::*, util::*};
 
+pub const SPLIT_REQUEST_FROM_TIKVCTL: u32 = 0x0800;
+
 fn main() {
     let opt = Opt::from_args();
 
@@ -604,7 +606,7 @@ fn split_region(pd_client: &RpcClient, mgr: Arc<SecurityManager>, region_id: u64
     req.mut_context()
         .set_region_epoch(region.get_region_epoch().clone());
     req.set_split_key(key);
-    req.set_encrypt(raftstore_v2::operation::SPLIT_REQUEST_FROM_TIKVCTL);
+    req.set_encrypt(SPLIT_REQUEST_FROM_TIKVCTL);
 
     let resp = tikv_client
         .split_region(&req)
