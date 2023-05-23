@@ -278,6 +278,8 @@ impl TikvServerCore {
         .map(Arc::new);
         if self.encryption_key_manager.is_none() {
             warn!("TiKV has no encryption_key_manager")
+        } else {
+            warn!("TiKV has encryption_key_manager")
         }
     }
 
