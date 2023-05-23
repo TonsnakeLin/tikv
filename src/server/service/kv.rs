@@ -798,6 +798,7 @@ impl<E: Engine, L: LockManager, F: KvFormat> Tikv for Service<E, L, F> {
         mut req: SplitRegionRequest,
         sink: UnarySink<SplitRegionResponse>,
     ) {
+        info!("split region request: {:?}", req);
         forward_unary!(self.proxy, split_region, ctx, req, sink);
         let begin_instant = Instant::now();
 

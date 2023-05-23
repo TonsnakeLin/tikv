@@ -519,6 +519,7 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
             "region" =>  ?self.region(),
             "checkpoint_duration" => ?checkpoint_duration,
             "total_duration" => ?elapsed,
+            "derived_region_is_encrypted" => ?req_encrypt_region,
         );
 
         let reg = self.tablet_registry();

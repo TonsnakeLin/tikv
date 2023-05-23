@@ -276,6 +276,9 @@ impl TikvServerCore {
         })
         .unwrap()
         .map(Arc::new);
+        if self.encryption_key_manager.is_none() {
+            warn!("TiKV has no encryption_key_manager")
+        }
     }
 
     pub fn init_io_utility(&mut self) -> BytesFetcher {
