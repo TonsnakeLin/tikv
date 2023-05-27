@@ -569,6 +569,9 @@ impl<EK: KvEngine, ER: RaftEngine> Storage<EK, ER> {
         info!(
             self.logger(),
             "begin to apply snapshot";
+            "region_id" => region_id,
+            "peer_id" => peer_id,
+            "is_encrypted" => is_encrypted,
         );
 
         let mut snap_data = RaftSnapshotData::default();
@@ -671,6 +674,12 @@ impl<EK: KvEngine, ER: RaftEngine> Storage<EK, ER> {
                     "tablet_index" => last_index
                 );
             }
+            info!(
+                self.logger(),
+                "install_tablet finished";
+                "path" => ?path,
+                "clean_split" => clean_split,
+            );
             if clean_split {
                 let path = temp_split_path(&reg, region_id);
                 if let Some(m) = key_manager {
