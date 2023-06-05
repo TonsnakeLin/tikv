@@ -198,11 +198,40 @@ impl KvEngineFactory {
         }
         kv_engine
     }
+
+    fn open_tablet_basic(&self, ctx: TabletContext, path: &Path, use_encryp_env: bool) -> Result<RocksEngine> {
+        let mut db_opts = self.db_opts(EngineType::RaftKv2, use_encryp_env);
+        let tablet_name = path.file_name().unwrap().to_str().unwrap().to_string();
+        db_opts.set_info_log(TabletLogger::new(tablet_name));
+        let factory = RangeCompactionFilterFactory::new(ctx.start_key.clone(), ctx.end_key.clone());
+        let cf_opts = self.cf_opts(Some(&factory), EngineType::RaftKv2);
+        if let Some(listener) = &self.inner.flow_listener {
+            db_opts.add_event_listener(listener.clone_with(ctx.id));
+        }
+        if let Some(storage) = &self.inner.state_storage
+            && let Some(flush_state) = ctx.flush_state {
+            let listener = PersistenceListener::new(
+                ctx.id,
+                ctx.suffix.unwrap(),
+                flush_state,
+                storage.clone(),
+            );
+            db_opts.add_event_listener(RocksPersistenceListener::new(listener));
+        }
+        let kv_engine =
+            engine_rocks::util::new_engine_opt(path.to_str().unwrap(), db_opts, cf_opts);
+        if let Err(e) = &kv_engine {
+            error!("failed to create tablet"; "id" => ctx.id, "suffix" => ?ctx.suffix, "path" => %path.display(), "err" => ?e);
+        } else if let Some(listener) = &self.inner.flow_listener {
+            listener.clone_with(ctx.id).on_created();
+        }
+        kv_engine
+    }
 }
 
 impl TabletFactory<RocksEngine> for KvEngineFactory {
     fn open_tablet(&self, ctx: TabletContext, path: &Path, use_encryp_env: bool) -> Result<RocksEngine> {
-        let res = self.open_tablet_basic(ctx, path, use_encryp_env);
+        let res = self.open_tablet_basic(ctx.clone(), path, use_encryp_env);
         if res.is_ok() {
             return res;
         }
@@ -238,36 +267,7 @@ impl TabletFactory<RocksEngine> for KvEngineFactory {
         }
         kv_engine
         */
-    }
-
-    fn open_tablet_basic(&self, ctx: TabletContext, path: &Path, use_encryp_env: bool) -> Result<RocksEngine> {
-        let mut db_opts = self.db_opts(EngineType::RaftKv2, use_encryp_env);
-        let tablet_name = path.file_name().unwrap().to_str().unwrap().to_string();
-        db_opts.set_info_log(TabletLogger::new(tablet_name));
-        let factory = RangeCompactionFilterFactory::new(ctx.start_key.clone(), ctx.end_key.clone());
-        let cf_opts = self.cf_opts(Some(&factory), EngineType::RaftKv2);
-        if let Some(listener) = &self.inner.flow_listener {
-            db_opts.add_event_listener(listener.clone_with(ctx.id));
-        }
-        if let Some(storage) = &self.inner.state_storage
-            && let Some(flush_state) = ctx.flush_state {
-            let listener = PersistenceListener::new(
-                ctx.id,
-                ctx.suffix.unwrap(),
-                flush_state,
-                storage.clone(),
-            );
-            db_opts.add_event_listener(RocksPersistenceListener::new(listener));
-        }
-        let kv_engine =
-            engine_rocks::util::new_engine_opt(path.to_str().unwrap(), db_opts, cf_opts);
-        if let Err(e) = &kv_engine {
-            error!("failed to create tablet"; "id" => ctx.id, "suffix" => ?ctx.suffix, "path" => %path.display(), "err" => ?e);
-        } else if let Some(listener) = &self.inner.flow_listener {
-            listener.clone_with(ctx.id).on_created();
-        }
-        kv_engine
-    }        
+    } 
 
     // todo: add the param `use_encryp_env` 
     fn destroy_tablet(&self, ctx: TabletContext, path: &Path) -> Result<()> {
