@@ -77,9 +77,11 @@ pub fn new_engine_opt(
             None => Arc::new(Env::default()),
         };
         // panic if OPTIONS not found for existing instance?
-        let (_, tmp) = load_latest_options(path, &env, true)
-            .unwrap_or_else(|e| panic!("failed to load_latest_options {:?}", e))
-            .unwrap_or_else(|| panic!("couldn't find the OPTIONS file"));
+        // let (_, tmp) = load_latest_options(path, &env, true)
+        //    .unwrap_or_else(|e| panic!("failed to load_latest_options {:?}", e))
+        //     .unwrap_or_else(|| panic!("couldn't find the OPTIONS file"));
+        let tmp_origin = load_latest_options(path, &env, true)?;
+        let (_, tmp) = tmp_origin.unwrap_or_else(|| panic!("couldn't find the OPTIONS file"));
         tmp
     } else {
         vec![]

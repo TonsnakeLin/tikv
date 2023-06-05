@@ -254,6 +254,7 @@ impl Store {
     {
         let derived_region_id = msg.derived_region_id;
         let region_id = msg.region.id;
+        let encrypted = msg.region.get_is_encrypted_region();
         let raft_msg = empty_split_message(self.store_id(), &msg.region);
 
         (|| {
@@ -289,7 +290,7 @@ impl Store {
                 "Split peer is destroyed before sending the intialization msg";
                 "split init msg" => ?m,
             );
-            report_split_init_finish(ctx, derived_region_id, region_id, true);
+            report_split_init_finish(ctx, derived_region_id, region_id, true, encrypted);
         }
     }
 

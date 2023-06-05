@@ -281,7 +281,7 @@ impl<EK: KvEngine> Runner<EK> {
             v.retain(|(path, wait, encrypted)| {
                 if *wait <= persisted {
                     if !Self::process_destroy_task(&self.logger, &self.tablet_registry, path, *encrypted) {
-                        self.pending_destroy_tasks.push((path.clone(), encrypted));
+                        self.pending_destroy_tasks.push((path.clone(), *encrypted));
                     }
                     return false;
                 }
