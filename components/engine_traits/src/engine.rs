@@ -72,7 +72,7 @@ pub trait KvEngine:
     #[cfg(any(test, feature = "testexport"))]
     fn inner_refcount(&self) -> usize;
 
-    fn has_key_manager_env() -> bool {
+    fn has_key_manager_env(&self) -> bool {
         false
     }
 }

@@ -280,7 +280,7 @@ impl<EK: KvEngine> Runner<EK> {
         if let Some(v) = self.waiting_destroy_tasks.get_mut(&region_id) {
             v.retain(|(path, wait, encrypted)| {
                 if *wait <= persisted {
-                    if !Self::process_destroy_task(&self.logger, &self.tablet_registry, path, encrypted) {
+                    if !Self::process_destroy_task(&self.logger, &self.tablet_registry, path, *encrypted) {
                         self.pending_destroy_tasks.push((path.clone(), encrypted));
                     }
                     return false;
@@ -293,7 +293,7 @@ impl<EK: KvEngine> Runner<EK> {
     fn direct_destroy(&mut self, tablet: Either<EK, PathBuf>, is_encrypted: bool) {
         let path = self.pause_background_work(tablet);
         if !Self::process_destroy_task(&self.logger, &self.tablet_registry, &path, is_encrypted) {
-            self.pending_destroy_tasks.push(path);
+            self.pending_destroy_tasks.push((path, is_encrypted));
         }
     }
 

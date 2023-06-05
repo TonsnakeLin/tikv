@@ -151,7 +151,7 @@ pub fn report_split_init_finish<EK, ER, T>(
         .schedule(tablet::Task::direct_destroy_path(temp_split_path(
             &ctx.tablet_registry,
             finish_region_id,
-        )))
+        ), encrypted))
     {
         error!(ctx.logger, "failed to destroy split init temp"; "error" => ?e);
     }
@@ -739,7 +739,8 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
         {
             // Race with split operation. The tablet created by split will eventually be
             // deleted. We don't trim it.
-            report_split_init_finish(store_ctx, split_init.derived_region_id, region_id, true);
+            let encryptd = split_init.region.get_is_encrypted_region();
+            report_split_init_finish(store_ctx, split_init.derived_region_id, region_id, true, encryptd);
             return;
         }
 
@@ -819,7 +820,8 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
         if split_init.check_split {
             self.add_pending_tick(PeerTick::SplitRegionCheck);
         }
-        report_split_init_finish(store_ctx, split_init.derived_region_id, region_id, false);
+        let encrypted = self.region().get_is_encrypted_region();
+        report_split_init_finish(store_ctx, split_init.derived_region_id, region_id, false, encrypted);
     }
 
     pub fn on_split_init_finish(&mut self, region_id: u64) {
