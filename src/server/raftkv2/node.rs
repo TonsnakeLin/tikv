@@ -120,7 +120,7 @@ where
         .bootstrap_first_region(&self.store, store_id)?
         {
             let path = registry.tablet_path(region.get_id(), RAFT_INIT_LOG_INDEX);
-            let ctx = TabletContext::new(&region, Some(RAFT_INIT_LOG_INDEX));
+            let ctx = TabletContext::new(&region, Some(RAFT_INIT_LOG_INDEX),region.get_is_encrypted_region());
             // TODO: make follow line can recover from abort.
             // TODO: if region.get_is_encrypted_region() is true, key_manager must exist.
             registry.tablet_factory().open_tablet(ctx, &path, region.get_is_encrypted_region()).unwrap();

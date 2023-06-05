@@ -435,7 +435,7 @@ mod tests {
             snap_index,
         ));
         reg.tablet_factory()
-            .open_tablet(TabletContext::new(&region, Some(snap_index)), &path, false)
+            .open_tablet(TabletContext::new(&region, Some(snap_index), false), &path, false)
             .unwrap();
         let snapshot = new_empty_snapshot(region.clone(), snap_index, snap_term, false);
         let mut task = WriteTask::new(region.get_id(), 5, 1);
@@ -489,7 +489,7 @@ mod tests {
         let cf_opts = DATA_CFS.iter().map(|cf| (*cf, CfOptions::new())).collect();
         let factory = Box::new(TestTabletFactory::new(ops, cf_opts));
         let reg = TabletRegistry::new(factory, path.path().join("tablets")).unwrap();
-        let tablet_ctx = TabletContext::new(&region, Some(10));
+        let tablet_ctx = TabletContext::new(&region, Some(10), false);
         reg.load(tablet_ctx, true, false).unwrap();
         // setup read runner worker and peer storage
         let mut worker = Worker::new("test-read-worker").lazy_build("test-read-worker");

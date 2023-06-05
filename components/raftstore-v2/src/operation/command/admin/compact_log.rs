@@ -297,6 +297,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
             "prev_tablet_path" => old_tablet.path(),
             "new_tablet_index" => new_tablet_index
         );
+        let is_encrypted = old_tablet.has_key_manager_env();
         let compact_log_context = self.compact_log_context_mut();
         compact_log_context
             .tombstone_tablets_wait_index
@@ -308,6 +309,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
                 old_tablet,
                 self.region_id(),
                 new_tablet_index,
+                is_encrypted,
             ));
     }
 
@@ -317,6 +319,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
         ctx: &StoreContext<EK, ER, T>,
         old_tablet: PathBuf,
         new_tablet_index: u64,
+        is_encrypted: bool,
     ) {
         info!(
             self.logger,
@@ -335,6 +338,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
                 old_tablet,
                 self.region_id(),
                 new_tablet_index,
+                is_encrypted,
             ));
     }
 
@@ -386,6 +390,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
             tablet,
             self.region_id(),
             applied_index,
+            self.region().get_is_encrypted_region(),
         ));
         task.persisted_cbs.push(Box::new(move || {
             let _ = sched.schedule(tablet::Task::destroy(region_id, applied_index));

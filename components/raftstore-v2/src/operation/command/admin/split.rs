@@ -132,6 +132,7 @@ pub fn report_split_init_finish<EK, ER, T>(
     derived_region_id: u64,
     finish_region_id: u64,
     cleanup: bool,
+    encrypted: bool,
 ) where
     EK: KvEngine,
     ER: RaftEngine,
@@ -524,7 +525,7 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
 
         let reg = self.tablet_registry();
         let path = reg.tablet_path(region_id, log_index);
-        let mut ctx = TabletContext::new(&regions[derived_index], Some(log_index));
+        let mut ctx = TabletContext::new(&regions[derived_index], Some(log_index), req_encrypt_region);
         // Now the tablet is flushed, so all previous states should be persisted.
         // Reusing the tablet should not be a problem.
         // TODO: Should we avoid flushing for the old tablet?
@@ -1034,7 +1035,7 @@ mod test {
             .collect();
         let factory = Box::new(TestTabletFactory::new(DbOptions::default(), cf_opts));
         let reg = TabletRegistry::new(factory, path.path()).unwrap();
-        let ctx = TabletContext::new(&region, Some(5));
+        let ctx = TabletContext::new(&region, Some(5), false);
         reg.load(ctx, true, false).unwrap();
 
         let mut region_state = RegionLocalState::default();

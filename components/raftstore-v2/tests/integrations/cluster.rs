@@ -302,7 +302,7 @@ impl RunningState {
         if let Some(region) = bootstrap.bootstrap_first_region(&store, store_id).unwrap() {
             let factory = registry.tablet_factory();
             let path = registry.tablet_path(region.get_id(), RAFT_INIT_LOG_INDEX);
-            let ctx = TabletContext::new(&region, Some(RAFT_INIT_LOG_INDEX));
+            let ctx = TabletContext::new(&region, Some(RAFT_INIT_LOG_INDEX), false);
             if factory.exists(&path) {
                 registry.remove(region.get_id());
                 factory.destroy_tablet(ctx.clone(), &path).unwrap();

@@ -367,7 +367,7 @@ mod tests {
         let (_dir, flow_controller, tx, reg) = create_tablet_flow_controller();
         let region_id = 5_u64;
         let tablet_suffix = 5_u64;
-        let tablet_context = TabletContext::with_infinite_region(region_id, Some(tablet_suffix));
+        let tablet_context = TabletContext::with_infinite_region(region_id, Some(tablet_suffix), false);
         reg.load(tablet_context, false).unwrap();
         tx.send(FlowInfo::Created(region_id)).unwrap();
         tx.send(FlowInfo::L0Intra("default".to_string(), 0, region_id))
@@ -384,8 +384,8 @@ mod tests {
         let (_dir, flow_controller, tx, reg) = create_tablet_flow_controller();
         let region_id = 5_u64;
         let tablet_suffix = 5_u64;
-        let tablet_context = TabletContext::with_infinite_region(region_id, Some(tablet_suffix));
-        reg.load(tablet_context, false).unwrap();
+        let tablet_context = TabletContext::with_infinite_region(region_id, Some(tablet_suffix), false);
+        reg.load(tablet_context, false, false).unwrap();
         tx.send(FlowInfo::Created(region_id)).unwrap();
         for _ in 0..30 {
             std::thread::sleep(WAIT_TICK);
@@ -435,8 +435,8 @@ mod tests {
         let (_dir, flow_controller, tx, reg) = create_tablet_flow_controller();
         let region_id = 5_u64;
         let tablet_suffix = 5_u64;
-        let tablet_context = TabletContext::with_infinite_region(region_id, Some(tablet_suffix));
-        let mut cached = reg.load(tablet_context, false).unwrap();
+        let tablet_context = TabletContext::with_infinite_region(region_id, Some(tablet_suffix), false);
+        let mut cached = reg.load(tablet_context, false, false).unwrap();
         let stub = cached.latest().unwrap().clone();
         tx.send(FlowInfo::Created(region_id)).unwrap();
         tx.send(FlowInfo::L0Intra("default".to_string(), 0, region_id))
@@ -449,8 +449,8 @@ mod tests {
         let (_dir, flow_controller, tx, reg) = create_tablet_flow_controller();
         let region_id = 5_u64;
         let tablet_suffix = 5_u64;
-        let tablet_context = TabletContext::with_infinite_region(region_id, Some(tablet_suffix));
-        let mut cached = reg.load(tablet_context, false).unwrap();
+        let tablet_context = TabletContext::with_infinite_region(region_id, Some(tablet_suffix), false);
+        let mut cached = reg.load(tablet_context, false, false).unwrap();
         let stub = cached.latest().unwrap().clone();
         tx.send(FlowInfo::Created(region_id)).unwrap();
         tx.send(FlowInfo::L0Intra("default".to_string(), 0, region_id))
@@ -463,8 +463,8 @@ mod tests {
         let (_dir, flow_controller, tx, reg) = create_tablet_flow_controller();
         let region_id = 5_u64;
         let tablet_suffix = 5_u64;
-        let tablet_context = TabletContext::with_infinite_region(region_id, Some(tablet_suffix));
-        let mut cached = reg.load(tablet_context, false).unwrap();
+        let tablet_context = TabletContext::with_infinite_region(region_id, Some(tablet_suffix), false);
+        let mut cached = reg.load(tablet_context, false, false).unwrap();
         let stub = cached.latest().unwrap().clone();
         tx.send(FlowInfo::Created(region_id)).unwrap();
         tx.send(FlowInfo::L0Intra("default".to_string(), 0, region_id))

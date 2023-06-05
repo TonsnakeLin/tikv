@@ -294,7 +294,7 @@ mod test {
             .collect();
         let factory = Box::new(TestTabletFactory::new(DbOptions::default(), cf_opts));
         let reg = TabletRegistry::new(factory, path.path()).unwrap();
-        let ctx = TabletContext::new(&region, Some(5));
+        let ctx = TabletContext::new(&region, Some(5), false);
         reg.load(ctx, true, false).unwrap();
 
         let mut region_state = RegionLocalState::default();

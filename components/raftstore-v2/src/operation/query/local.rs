@@ -847,7 +847,7 @@ mod tests {
                 bucket_meta: Some(bucket_meta.clone()),
             };
             // create tablet with region_id 1 and prepare some data
-            let ctx = TabletContext::new(&region1, Some(10));
+            let ctx = TabletContext::new(&region1, Some(10), false);
             let mut tablet = reg.load(ctx, true, false).unwrap();
             let shared = SharedReadTablet::new(tablet.latest().unwrap().clone());
             meta.readers.insert(1, (read_delegate, shared));
@@ -927,7 +927,7 @@ mod tests {
 
         // Case: Tablet miss should triger retry.
         {
-            let ctx = TabletContext::new(&region1, Some(15));
+            let ctx = TabletContext::new(&region1, Some(15), false);
             let mut tablet = reg.load(ctx, true, false).unwrap();
             let shared = SharedReadTablet::new(tablet.latest().unwrap().clone());
             let mut meta = store_meta.lock().unwrap();
@@ -1005,7 +1005,7 @@ mod tests {
             let read_delegate = ReadDelegate::mock(1);
 
             // create tablet with region_id 1 and prepare some data
-            let mut ctx = TabletContext::with_infinite_region(1, Some(10));
+            let mut ctx = TabletContext::with_infinite_region(1, Some(10), false);
             reg.load(ctx, true, false).unwrap();
             tablet1 = reg.get(1).unwrap().latest().unwrap().clone();
             tablet1.put(b"a1", b"val1").unwrap();
@@ -1016,7 +1016,7 @@ mod tests {
             let read_delegate = ReadDelegate::mock(2);
 
             // create tablet with region_id 1 and prepare some data
-            ctx = TabletContext::with_infinite_region(2, Some(10));
+            ctx = TabletContext::with_infinite_region(2, Some(10), false);
             reg.load(ctx, true, false).unwrap();
             tablet2 = reg.get(2).unwrap().latest().unwrap().clone();
             tablet2.put(b"a2", b"val2").unwrap();

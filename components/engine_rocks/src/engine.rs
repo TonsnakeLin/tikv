@@ -199,6 +199,10 @@ impl KvEngine for RocksEngine {
     fn inner_refcount(&self) -> usize {
         Arc::strong_count(&self.db)
     }
+
+    fn has_key_manager_env(&self) -> bool {
+        false
+    }
 }
 
 impl Iterable for RocksEngine {

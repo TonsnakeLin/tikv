@@ -1405,7 +1405,7 @@ mod test {
         let reg = TabletRegistry::new(Box::new(factory), path.path().join("tablets")).unwrap();
 
         for i in 1..6 {
-            let ctx = TabletContext::with_infinite_region(i, Some(10));
+            let ctx = TabletContext::with_infinite_region(i, Some(10), false);
             reg.load(ctx, true, false).unwrap();
         }
 
@@ -1424,7 +1424,7 @@ mod test {
             .unwrap()
             .unwrap();
 
-        let ctx = TabletContext::with_infinite_region(1, Some(20));
+        let ctx = TabletContext::with_infinite_region(1, Some(20), false);
         reg.load(ctx, true, false).unwrap();
         tablet = cached.latest().unwrap();
 

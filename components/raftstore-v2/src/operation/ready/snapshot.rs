@@ -241,7 +241,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
             let region_id = self.region_id();
             self.reset_flush_state(snapshot_index);
             let flush_state = self.flush_state().clone();
-            let mut tablet_ctx = TabletContext::new(self.region(), Some(snapshot_index));
+            let mut tablet_ctx = TabletContext::new(self.region(), Some(snapshot_index), self.region().get_is_encrypted_region());
             // Use a new FlushState to avoid conflicts with the old one.
             tablet_ctx.flush_state = Some(flush_state);
             let path = ctx.tablet_registry.tablet_path(region_id, snapshot_index);
@@ -675,7 +675,7 @@ impl<EK: KvEngine, ER: RaftEngine> Storage<EK, ER> {
                 );
             }
             info!(
-                self.logger(),
+                logger,
                 "install_tablet finished";
                 "path" => ?path,
                 "clean_split" => clean_split,

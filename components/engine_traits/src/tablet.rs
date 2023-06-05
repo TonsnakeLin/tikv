@@ -103,6 +103,8 @@ pub struct TabletContext {
     ///
     /// If not set, apply may not be resumed correctly.
     pub flush_state: Option<Arc<FlushState>>,
+
+    pub is_encrypted: bool,
 }
 
 impl Debug for TabletContext {
@@ -117,22 +119,23 @@ impl Debug for TabletContext {
 }
 
 impl TabletContext {
-    pub fn new(region: &Region, suffix: Option<u64>) -> Self {
+    pub fn new(region: &Region, suffix: Option<u64>, is_encrypted: bool) -> Self {
         TabletContext {
             id: region.get_id(),
             suffix,
             start_key: keys::data_key(region.get_start_key()).into_boxed_slice(),
             end_key: keys::data_end_key(region.get_end_key()).into_boxed_slice(),
             flush_state: None,
+            is_encrypted,
         }
     }
 
     /// Create a context that assumes there is only one region and it covers the
     /// whole key space. Normally you should only use this in tests.
-    pub fn with_infinite_region(id: u64, suffix: Option<u64>) -> Self {
+    pub fn with_infinite_region(id: u64, suffix: Option<u64>, encrypted: bool) -> Self {
         let mut region = Region::default();
         region.set_id(id);
-        Self::new(&region, suffix)
+        Self::new(&region, suffix, encrypted)
     }
 }
 
@@ -369,7 +372,7 @@ mod tests {
         let tablet = Arc::new(1);
         let singleton = SingletonFactory::new(tablet.clone());
         let registry = TabletRegistry::new(Box::new(singleton), "").unwrap();
-        let mut ctx = TabletContext::with_infinite_region(1, Some(1));
+        let mut ctx = TabletContext::with_infinite_region(1, Some(1), false);
         registry.load(ctx.clone(), true, false).unwrap();
         let mut cached = registry.get(1).unwrap();
         assert_eq!(cached.latest().cloned(), Some(tablet.clone()));
@@ -433,7 +436,7 @@ mod tests {
         };
         let registry = TabletRegistry::new(Box::new(factory), "").unwrap();
 
-        let mut ctx = TabletContext::with_infinite_region(1, Some(10));
+        let mut ctx = TabletContext::with_infinite_region(1, Some(10), false);
         let mut tablet_1_10 = registry.load(ctx.clone(), true, false).unwrap();
         // It's open already, load it twice should report lock error.
         registry.load(ctx.clone(), true, false).unwrap_err();

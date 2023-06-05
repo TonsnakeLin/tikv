@@ -408,7 +408,7 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
             "source_region" => ?source_region,
         );
 
-        let ctx = TabletContext::new(source_region, None);
+        let ctx = TabletContext::new(source_region, None, source_region.get_is_encrypted_region());
         let source_tablet = reg
             .tablet_factory()
             .open_tablet(ctx, &source_path, source_region.get_is_encrypted_region())
@@ -437,7 +437,7 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
         self.tablet().flush_cfs(&[], true).unwrap();
         let flush_time = Instant::now_coarse();
 
-        let mut ctx = TabletContext::new(&region, Some(index));
+        let mut ctx = TabletContext::new(&region, Some(index), region.get_is_encrypted_region());
         ctx.flush_state = Some(self.flush_state().clone());
         let guard = MergeInProgressGuard::new(&self.logger, reg, self.region_id(), index, &path)
             .unwrap_or_else(|e| {
@@ -694,6 +694,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
         store_ctx: &mut StoreContext<EK, ER, T>,
         mut res: CommitMergeResult,
     ) {
+        let source_encrypted = res.source.get_is_encrypted_region();
         let region = res.region_state.get_region();
         assert!(
             res.source.get_end_key() == region.get_end_key()
@@ -752,7 +753,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
         if let Some(tablet) = self.set_tablet(tablet) {
             self.record_tombstone_tablet(store_ctx, tablet, res.index);
         }
-        self.record_tombstone_tablet_path(store_ctx, res.source_path, res.index);
+        self.record_tombstone_tablet_path(store_ctx, res.source_path, res.index, source_encrypted);
 
         // make approximate size and keys updated in time.
         // the reason why follower need to update is that there is a issue that after

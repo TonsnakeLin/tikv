@@ -156,7 +156,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
             raft_group
                 .store()
                 .recover_tablet(tablet_registry, key_manager, snap_mgr);
-            let mut ctx = TabletContext::new(&region, Some(tablet_index));
+            let mut ctx = TabletContext::new(&region, Some(tablet_index), region.get_is_encrypted_region());
             ctx.flush_state = Some(flush_state.clone());
             // TODO: Perhaps we should stop create the tablet automatically.
             tablet_registry.load(ctx, false, region.get_is_encrypted_region())?;

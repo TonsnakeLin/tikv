@@ -569,7 +569,7 @@ fn get_tablet_cache(
     } else {
         let region_state = state.unwrap();
         let is_encrypted = region_state.get_region().get_is_encrypted_region();
-        let ctx = TabletContext::new(region_state.get_region(), Some(region_state.tablet_index));
+        let ctx = TabletContext::new(region_state.get_region(), Some(region_state.tablet_index), is_encrypted);
         match tablet_reg.load(ctx, false, is_encrypted) {
             Ok(tablet_cache) => Ok(tablet_cache),
             Err(e) => {
@@ -664,7 +664,7 @@ mod tests {
         state.set_region(region.clone());
         state.set_tablet_index(5);
 
-        let ctx = TabletContext::new(&region, Some(5));
+        let ctx = TabletContext::new(&region, Some(5), is_encrypted);
         let mut tablet_cache = debugger.tablet_reg.load(ctx, true, false).unwrap();
         let tablet = tablet_cache.latest().unwrap();
 
@@ -767,7 +767,7 @@ mod tests {
         state.set_region(region.clone());
         state.set_tablet_index(5);
 
-        let ctx = TabletContext::new(&region, Some(5));
+        let ctx = TabletContext::new(&region, Some(5), false);
         let mut tablet_cache = debugger.tablet_reg.load(ctx, true, false).unwrap();
         let tablet = tablet_cache.latest().unwrap();
 
