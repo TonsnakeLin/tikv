@@ -80,8 +80,17 @@ pub fn new_engine_opt(
         // let (_, tmp) = load_latest_options(path, &env, true)
         //    .unwrap_or_else(|e| panic!("failed to load_latest_options {:?}", e))
         //     .unwrap_or_else(|| panic!("couldn't find the OPTIONS file"));
-        let tmp_origin = load_latest_options(path, &env, true)?;
-        let (_, tmp) = tmp_origin.unwrap_or_else(|| panic!("couldn't find the OPTIONS file"));
+        let tmp_origin = load_latest_options(path, &env, true);
+        if tmp_origin.is_err() {
+            return Err(engine_traits::Error::Engine(
+                engine_traits::Status::with_error(
+                    engine_traits::Code::InvalidArgument,
+                    "load_latest_options error",
+                ),
+            ));
+        }
+        let (_, tmp) = tmp_origin.unwrap()
+        .unwrap_or_else(|| panic!("couldn't find the OPTIONS file"));
         tmp
     } else {
         vec![]
