@@ -9,7 +9,7 @@ use raftstore::{
         fsm::apply::notify_stale_req,
         metrics::RAFT_READ_INDEX_PENDING_COUNT,
         msg::{ErrorCallback, ReadCallback},
-        propose_read_index, Config, ReadIndexContext, ReadIndexRequest, Transport,
+        propose_read_index, Config, ReadIndexContext, ReadIndexRequest,
     },
     Error,
 };
@@ -49,7 +49,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
     /// read index on follower
     ///
     /// call set_has_ready if it's proposed.
-    pub(crate) fn read_index_follower<T: Transport>(
+    pub(crate) fn read_index_follower<T>(
         &mut self,
         ctx: &mut StoreContext<EK, ER, T>,
         mut req: RaftCmdRequest,
@@ -73,7 +73,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
             .filter(|req| req.has_read_index())
             .map(|req| req.take_read_index());
         // No need to check `dropped` as it only meaningful for leader.
-        let (id, _dropped) = propose_read_index(self.raft_group_mut(), request.as_ref(), None);
+        let (id, _dropped) = propose_read_index(self.raft_group_mut(), request.as_ref());
         let now = monotonic_raw_now();
         let mut read = ReadIndexRequest::with_command(id, req, ch, now);
         read.addition_request = request.map(Box::new);

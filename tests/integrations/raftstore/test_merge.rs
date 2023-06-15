@@ -16,7 +16,7 @@ use test_raftstore_macro::test_case;
 use test_raftstore_v2::Simulator as _;
 use tikv::storage::{kv::SnapshotExt, Snapshot};
 use tikv_util::{config::*, HandyRwLock};
-use txn_types::{Key, PessimisticLock};
+use txn_types::{Key, LastChange, PessimisticLock};
 
 /// Test if merge is working as expected in a general condition.
 #[test_case(test_raftstore::new_node_cluster)]
@@ -1354,8 +1354,8 @@ fn test_propose_in_memory_pessimistic_locks() {
         ttl: 3000,
         for_update_ts: 20.into(),
         min_commit_ts: 30.into(),
-        last_change_ts: 5.into(),
-        versions_to_last_change: 3,
+        last_change: LastChange::make_exist(5.into(), 3),
+        is_locked_with_conflict: false,
     };
     txn_ext
         .pessimistic_locks
@@ -1372,8 +1372,8 @@ fn test_propose_in_memory_pessimistic_locks() {
         ttl: 3000,
         for_update_ts: 20.into(),
         min_commit_ts: 30.into(),
-        last_change_ts: 5.into(),
-        versions_to_last_change: 3,
+        last_change: LastChange::make_exist(5.into(), 3),
+        is_locked_with_conflict: false,
     };
     txn_ext
         .pessimistic_locks
@@ -1445,10 +1445,10 @@ fn test_merge_pessimistic_locks_when_gap_is_too_large() {
 
     // The gap is too large, so the previous merge should fail. And this new put
     // request should be allowed.
-    let res = cluster.async_put(b"k1", b"new_val").unwrap();
+    let mut res = cluster.async_put(b"k1", b"new_val").unwrap();
 
     cluster.clear_send_filters();
-    res.recv().unwrap();
+    res.recv_timeout(Duration::from_secs(5)).unwrap();
 
     assert_eq!(cluster.must_get(b"k1").unwrap(), b"new_val");
 }
@@ -1483,8 +1483,8 @@ fn test_merge_pessimistic_locks_repeated_merge() {
         ttl: 3000,
         for_update_ts: 20.into(),
         min_commit_ts: 30.into(),
-        last_change_ts: 5.into(),
-        versions_to_last_change: 3,
+        last_change: LastChange::make_exist(5.into(), 3),
+        is_locked_with_conflict: false,
     };
     txn_ext
         .pessimistic_locks

@@ -25,7 +25,7 @@ use raftstore::{
     store::{
         cmd_resp, local_metrics::RaftMetrics, metrics::RAFT_READ_INDEX_PENDING_COUNT,
         msg::ErrorCallback, region_meta::RegionMeta, util, util::LeaseState, GroupState,
-        ReadIndexContext, ReadProgress, RequestPolicy, Transport,
+        ReadIndexContext, ReadProgress, RequestPolicy,
     },
     Error, Result,
 };
@@ -164,7 +164,12 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
             return Err(e);
         }
 
-        // TODO: check applying snapshot
+        // Check whether the peer is initialized.
+        if !self.storage().is_initialized() {
+            raft_metrics.invalid_proposal.region_not_initialized.inc();
+            let region_id = msg.get_header().get_region_id();
+            return Err(Error::RegionNotInitialized(region_id));
+        }
 
         // Check whether the term is stale.
         if let Err(e) = util::check_term(msg.get_header(), self.term()) {
@@ -180,7 +185,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
     // 1. The region is in merging or splitting;
     // 2. The message is stale and dropped by the Raft group internally;
     // 3. There is already a read request proposed in the current lease;
-    fn read_index<T: Transport>(
+    fn read_index<T>(
         &mut self,
         ctx: &mut StoreContext<EK, ER, T>,
         req: RaftCmdRequest,

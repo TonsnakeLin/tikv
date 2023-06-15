@@ -8,7 +8,7 @@ use std::{
     usize,
 };
 
-use api_version::{dispatch_api_version, KvFormat};
+use api_version::{dispatch_api_version, ApiV1, KvFormat};
 use causal_ts::CausalTsProviderImpl;
 use collections::{HashMap, HashSet};
 use concurrency_manager::ConcurrencyManager;
@@ -66,7 +66,8 @@ use tikv::{
     },
     storage::{
         self,
-        kv::{FakeExtension, LocalTablets, SnapContext},
+        kv::{FakeExtension, LocalTablets, MockEngine, SnapContext},
+        lock_manager::MockLockManager,
         txn::flow_controller::{EngineFlowController, FlowController},
         Engine, Storage,
     },
@@ -489,13 +490,18 @@ impl ServerCluster {
                 .unwrap(),
         );
 
-        let debugger = DebuggerImpl::new(engines.clone(), ConfigController::default());
+        let debugger: DebuggerImpl<_, MockEngine, MockLockManager, ApiV1> = DebuggerImpl::new(
+            engines.clone(),
+            ConfigController::new(cfg.tikv.clone()),
+            None,
+        );
         let debug_thread_handle = debug_thread_pool.handle().clone();
         let debug_service = DebugService::new(debugger, debug_thread_handle, extension);
 
         let apply_router = system.apply_router();
         // Create node.
         let mut raft_store = cfg.raft_store.clone();
+        raft_store.optimize_for(false);
         raft_store
             .validate(
                 cfg.coprocessor.region_split_size(),
@@ -787,6 +793,14 @@ impl Simulator for ServerCluster {
 
 impl Cluster<ServerCluster> {
     pub fn must_get_snapshot_of_region(&mut self, region_id: u64) -> RegionSnapshot<RocksSnapshot> {
+        self.must_get_snapshot_of_region_with_ctx(region_id, Default::default())
+    }
+
+    pub fn must_get_snapshot_of_region_with_ctx(
+        &mut self,
+        region_id: u64,
+        snap_ctx: SnapContext<'_>,
+    ) -> RegionSnapshot<RocksSnapshot> {
         let mut try_snapshot = || -> Option<RegionSnapshot<RocksSnapshot>> {
             let leader = self.leader_of_region(region_id)?;
             let store_id = leader.store_id;
@@ -799,7 +813,7 @@ impl Cluster<ServerCluster> {
             let mut storage = self.sim.rl().storages.get(&store_id).unwrap().clone();
             let snap_ctx = SnapContext {
                 pb_ctx: &ctx,
-                ..Default::default()
+                ..snap_ctx.clone()
             };
             storage.snapshot(snap_ctx).ok()
         };

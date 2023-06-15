@@ -15,7 +15,7 @@ use encryption_export::DataKeyManager;
 use engine_rocks::RocksEngine;
 use engine_test::raft::RaftTestEngine;
 use engine_traits::{KvEngine, RaftEngine, TabletRegistry};
-use futures::{executor::block_on, Future};
+use futures::{executor::block_on, future::BoxFuture, Future};
 use grpcio::{ChannelBuilder, EnvBuilder, Environment, Error as GrpcError, Service};
 use grpcio_health::HealthService;
 use kvproto::{
@@ -164,6 +164,18 @@ impl<EK: KvEngine> Engine for TestRaftKv2<EK> {
     #[inline]
     fn schedule_txn_extra(&self, txn_extra: txn_types::TxnExtra) {
         self.raftkv.schedule_txn_extra(txn_extra)
+    }
+
+    fn start_flashback(
+        &self,
+        ctx: &Context,
+        start_ts: u64,
+    ) -> BoxFuture<'static, storage::kv::Result<()>> {
+        self.raftkv.start_flashback(ctx, start_ts)
+    }
+
+    fn end_flashback(&self, ctx: &Context) -> BoxFuture<'static, storage::kv::Result<()>> {
+        self.raftkv.end_flashback(ctx)
     }
 }
 
@@ -364,6 +376,7 @@ impl<EK: KvEngine> ServerCluster<EK> {
 
         // Create node.
         let mut raft_store = cfg.raft_store.clone();
+        raft_store.optimize_for(true);
         raft_store
             .validate(
                 cfg.coprocessor.region_split_size(),
@@ -811,10 +824,11 @@ impl<EK: KvEngine> Simulator<EK> for ServerCluster<EK> {
 
     fn async_snapshot(
         &mut self,
+        node_id: u64,
         request: kvproto::raft_cmdpb::RaftCmdRequest,
-    ) -> impl Future<Output = std::result::Result<RegionSnapshot<EK::Snapshot>, RaftCmdResponse>> + Send
-    {
-        let node_id = request.get_header().get_peer().get_store_id();
+    ) -> impl Future<Output = std::result::Result<RegionSnapshot<EK::Snapshot>, RaftCmdResponse>>
+    + Send
+    + 'static {
         let mut router = match self.metas.get(&node_id) {
             None => {
                 let mut resp = RaftCmdResponse::default();
@@ -872,6 +886,14 @@ impl<EK: KvEngine> Simulator<EK> for ServerCluster<EK> {
 
 impl<EK: KvEngine> Cluster<ServerCluster<EK>, EK> {
     pub fn must_get_snapshot_of_region(&mut self, region_id: u64) -> RegionSnapshot<EK::Snapshot> {
+        self.must_get_snapshot_of_region_with_ctx(region_id, SnapContext::default())
+    }
+
+    pub fn must_get_snapshot_of_region_with_ctx(
+        &mut self,
+        region_id: u64,
+        snap_ctx: SnapContext<'_>,
+    ) -> RegionSnapshot<EK::Snapshot> {
         let mut try_snapshot = || -> Option<RegionSnapshot<EK::Snapshot>> {
             let leader = self.leader_of_region(region_id)?;
             let store_id = leader.store_id;
@@ -884,7 +906,7 @@ impl<EK: KvEngine> Cluster<ServerCluster<EK>, EK> {
             let mut storage = self.sim.rl().storages.get(&store_id).unwrap().clone();
             let snap_ctx = SnapContext {
                 pb_ctx: &ctx,
-                ..Default::default()
+                ..snap_ctx.clone()
             };
             storage.snapshot(snap_ctx).ok()
         };
