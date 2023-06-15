@@ -145,14 +145,15 @@ impl<EK> Task<EK> {
         path: PathBuf,
         region_id: u64,
         wait_for_persisted: u64,
+        is_encrypted: bool,
         cb: impl FnOnce() + Send + 'static,
     ) -> Self {
         Task::PrepareDestroy {
             tablet: Either::Right(path),
             region_id,
             wait_for_persisted,
+            is_encrypted,
             cb: Some(Box::new(cb)),
->>>>>>> 4510531b275886bdc41fe3ad1ba462e3126a3712
         }
     }
 
@@ -300,7 +301,7 @@ impl<EK: KvEngine> Runner<EK> {
 
     fn destroy(&mut self, region_id: u64, persisted: u64) {
         if let Some(v) = self.waiting_destroy_tasks.get_mut(&region_id) {
-            v.retain_mut(|(path, wait, cb)| {
+            v.retain_mut(|(path, wait, encrypted, cb)| {
                 if *wait <= persisted {
                     let cb = cb.take();
                     if !Self::process_destroy_task(&self.logger, &self.tablet_registry, path, *encrypted) {
@@ -446,8 +447,8 @@ where
     EK: KvEngine,
 {
     fn on_timeout(&mut self) {
-        self.pending_destroy_tasks.retain_mut(|(path, cb)| {
-            let r = Self::process_destroy_task(&self.logger, &self.tablet_registry, &task.0, task.1);
+        self.pending_destroy_tasks.retain_mut(|(path, encrypted, cb)| {
+            let r = Self::process_destroy_task(&self.logger, &self.tablet_registry, path, *encrypted);
             if r && let Some(cb) = cb.take() {
                 cb();
             }

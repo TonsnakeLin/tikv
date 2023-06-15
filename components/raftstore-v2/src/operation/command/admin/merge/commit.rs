@@ -257,6 +257,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
         let merge = req.get_admin_request().get_commit_merge();
         assert!(merge.has_source_state() && merge.get_source_state().has_merge_state());
         let source_region = merge.get_source_state().get_region();
+        let source_encrypted = source_region.get_is_encrypted_region();
         let region = self.region();
         if let Some(r) = self
             .storage()
@@ -276,7 +277,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
             let source_path =
                 merge_source_path(&store_ctx.tablet_registry, source_region.get_id(), index);
             assert!(source_path.exists());
-            self.record_tombstone_tablet_path(store_ctx, source_path, r.get_index());
+            self.record_tombstone_tablet_path(store_ctx, source_path, r.get_index(), source_encrypted);
             let _ = store_ctx.router.force_send(
                 source_region.get_id(),
                 PeerMsg::AckCommitMerge {

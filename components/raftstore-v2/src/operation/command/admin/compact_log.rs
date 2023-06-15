@@ -379,6 +379,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
                 old_tablet,
                 self.region_id(),
                 new_tablet_index,
+                self.region().get_is_encrypted_region(),
                 cb,
             ));
     }
