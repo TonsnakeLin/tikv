@@ -41,7 +41,8 @@ use raftstore::{
             APPLY_TASK_WAIT_TIME_HISTOGRAM, APPLY_TIME_HISTOGRAM, STORE_APPLY_LOG_HISTOGRAM,
         },
         msg::ErrorCallback,
-        util, Config, Transport, WriteCallback,
+        util::{self, check_flashback_state},
+        Config, Transport, WriteCallback,
     },
     Error, Result,
 };
@@ -65,9 +66,9 @@ mod control;
 mod write;
 
 pub use admin::{
-    report_split_init_finish, temp_split_path, AdminCmdResult, CatchUpLogs, CompactLogContext,
-    MergeContext, RequestHalfSplit, RequestSplit, SplitFlowControl, SplitInit,
-    MERGE_IN_PROGRESS_PREFIX, MERGE_SOURCE_PREFIX, SPLIT_PREFIX,
+    merge_source_path, report_split_init_finish, temp_split_path, AdminCmdResult, CatchUpLogs,
+    CompactLogContext, MergeContext, RequestHalfSplit, RequestSplit, SplitFlowControl, SplitInit,
+    SplitPendingAppend, MERGE_IN_PROGRESS_PREFIX, MERGE_SOURCE_PREFIX, SPLIT_PREFIX,
     SPLIT_REQUEST_FROM_PD_HEARTBEAT, SPLIT_REQUEST_FROM_TIKV_AUTOSPLIT,
 };
 pub use control::ProposalControl;
@@ -191,6 +192,29 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
             if let Error::EpochNotMatch(_, _new_regions) = &mut e {
                 // TODO: query sibling regions.
                 metrics.invalid_proposal.epoch_not_match.inc();
+            }
+            return Err(e);
+        }
+        // Check whether the region is in the flashback state and the request could be
+        // proposed. Skip the not prepared error because the
+        // `self.region().is_in_flashback` may not be the latest right after applying
+        // the `PrepareFlashback` admin command, we will let it pass here and check in
+        // the apply phase and because a read-only request doesn't need to be applied,
+        // so it will be allowed during the flashback progress, for example, a snapshot
+        // request.
+        if let Err(e) = util::check_flashback_state(
+            self.region().get_is_in_flashback(),
+            self.region().get_flashback_start_ts(),
+            header,
+            admin_type,
+            self.region_id(),
+            true,
+        ) {
+            match e {
+                Error::FlashbackInProgress(..) => {
+                    metrics.invalid_proposal.flashback_in_progress.inc()
+                }
+                _ => unreachable!("{:?}", e),
             }
             return Err(e);
         }
@@ -345,10 +369,13 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
         ctx: &mut StoreContext<EK, ER, T>,
         apply_res: ApplyRes,
     ) {
-        if !self.serving() || !apply_res.admin_result.is_empty() {
-            // TODO: remove following log once stable.
-            debug!(self.logger, "on_apply_res"; "apply_res" => ?apply_res, "apply_trace" => ?self.storage().apply_trace());
-        }
+        debug!(
+            self.logger,
+            "async apply finish";
+            "res" => ?apply_res,
+            "serving" => self.serving(),
+            "apply_trace" => ?self.storage().apply_trace(),
+        );
         // It must just applied a snapshot.
         if apply_res.applied_index < self.entry_storage().first_index() {
             // Ignore admin command side effects, otherwise it may split incomplete
@@ -368,11 +395,13 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
                         .on_admin_modify(res.tablet_index);
                     self.on_apply_res_split(ctx, res)
                 }
-                AdminCmdResult::TransferLeader(term) => self.on_transfer_leader(ctx, term),
+                AdminCmdResult::TransferLeader(term) => self.on_transfer_leader(term),
                 AdminCmdResult::CompactLog(res) => self.on_apply_res_compact_log(ctx, res),
                 AdminCmdResult::UpdateGcPeers(state) => self.on_apply_res_update_gc_peers(state),
                 AdminCmdResult::PrepareMerge(res) => self.on_apply_res_prepare_merge(ctx, res),
                 AdminCmdResult::CommitMerge(res) => self.on_apply_res_commit_merge(ctx, res),
+                AdminCmdResult::Flashback(res) => self.on_apply_res_flashback(ctx, res),
+                AdminCmdResult::RollbackMerge(res) => self.on_apply_res_rollback_merge(ctx, res),
             }
         }
         self.region_buckets_info_mut()
@@ -406,7 +435,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
             progress_to_be_updated,
         );
         self.try_compelete_recovery();
-        if !self.pause_for_recovery() && self.storage_mut().apply_trace_mut().should_flush() {
+        if !self.pause_for_replay() && self.storage_mut().apply_trace_mut().should_flush() {
             if let Some(scheduler) = self.apply_scheduler() {
                 scheduler.send(ApplyTask::ManualFlush);
             }
@@ -522,6 +551,8 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
     #[inline]
     pub async fn apply_committed_entries(&mut self, ce: CommittedEntries) {
         fail::fail_point!("APPLY_COMMITTED_ENTRIES");
+        fail::fail_point!("on_handle_apply_1003", self.peer_id() == 1003, |_| {});
+        fail::fail_point!("on_handle_apply_2", self.peer_id() == 2, |_| {});
         let now = std::time::Instant::now();
         let apply_wait_time = APPLY_TASK_WAIT_TIME_HISTOGRAM.local();
         for (e, ch) in ce.entry_and_proposals {
@@ -575,6 +606,13 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
                 entry.get_term(),
             ) {
                 Ok(decoder) => {
+                    fail::fail_point!(
+                        "on_apply_write_cmd",
+                        cfg!(release) || self.peer_id() == 3,
+                        |_| {
+                            unimplemented!();
+                        }
+                    );
                     util::compare_region_epoch(
                         decoder.header().get_region_epoch(),
                         self.region(),
@@ -633,6 +671,16 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
         };
 
         util::check_req_region_epoch(&req, self.region(), true)?;
+        let header = req.get_header();
+        let admin_type = req.admin_request.as_ref().map(|req| req.get_cmd_type());
+        check_flashback_state(
+            self.region().get_is_in_flashback(),
+            self.region().get_flashback_start_ts(),
+            header,
+            admin_type,
+            self.region_id(),
+            false,
+        )?;
         if req.has_admin_request() {
             let admin_req = req.get_admin_request();
             let (admin_resp, admin_result) = match req.get_admin_request().get_cmd_type() {
@@ -641,7 +689,7 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
                 AdminCmdType::BatchSplit => self.apply_batch_split(admin_req, log_index).await?,
                 AdminCmdType::PrepareMerge => self.apply_prepare_merge(admin_req, log_index)?,
                 AdminCmdType::CommitMerge => self.apply_commit_merge(admin_req, log_index).await?,
-                AdminCmdType::RollbackMerge => unimplemented!(),
+                AdminCmdType::RollbackMerge => self.apply_rollback_merge(admin_req, log_index)?,
                 AdminCmdType::TransferLeader => {
                     self.apply_transfer_leader(admin_req, entry.term)?
                 }
@@ -653,8 +701,9 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
                 }
                 AdminCmdType::ComputeHash => unimplemented!(),
                 AdminCmdType::VerifyHash => unimplemented!(),
-                AdminCmdType::PrepareFlashback => unimplemented!(),
-                AdminCmdType::FinishFlashback => unimplemented!(),
+                AdminCmdType::PrepareFlashback | AdminCmdType::FinishFlashback => {
+                    self.apply_flashback(log_index, admin_req)?
+                }
                 AdminCmdType::BatchSwitchWitness => unimplemented!(),
                 AdminCmdType::UpdateGcPeer => self.apply_update_gc_peer(log_index, admin_req),
                 AdminCmdType::InvalidAdmin => {
@@ -693,7 +742,11 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
                             self.use_delete_range(),
                         )?;
                     }
-                    _ => unimplemented!(),
+                    _ => slog_panic!(
+                        self.logger,
+                        "unimplemented";
+                        "request_type" => ?r.get_cmd_type(),
+                    ),
                 }
             }
             let resp = new_response(req.get_header());

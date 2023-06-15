@@ -32,8 +32,8 @@ use raftstore::{
             GlobalStoreStat, LocalStoreStat,
         },
         local_metrics::RaftMetrics,
-        AutoSplitController, Config, ReadRunner, ReadTask, SplitCheckRunner, SplitCheckTask,
-        StoreWriters, TabletSnapManager, Transport, WriteSenders,
+        AutoSplitController, Config, ReadRunner, ReadTask, RefreshConfigTask, SplitCheckRunner,
+        SplitCheckTask, StoreWriters, TabletSnapManager, Transport, WriteSenders,
     },
 };
 use resource_metering::CollectorRegHandle;
@@ -44,7 +44,7 @@ use tikv_util::{
     config::{Tracker, VersionTrack},
     log::SlogFormat,
     sys::SysQuota,
-    time::{duration_to_sec, Instant as TiInstant},
+    time::{duration_to_sec, Instant as TiInstant, Limiter},
     timer::SteadyTimer,
     worker::{Builder, LazyWorker, Scheduler, Worker},
     yatp_pool::{DefaultTicker, FuturePool, YatpPoolBuilder},
@@ -54,12 +54,17 @@ use time::Timespec;
 
 use crate::{
     fsm::{PeerFsm, PeerFsmDelegate, SenderFsmPair, StoreFsm, StoreFsmDelegate, StoreMeta},
-    operation::{SharedReadTablet, MERGE_IN_PROGRESS_PREFIX, MERGE_SOURCE_PREFIX, SPLIT_PREFIX},
+    operation::{
+        ReplayWatch, SharedReadTablet, MERGE_IN_PROGRESS_PREFIX, MERGE_SOURCE_PREFIX, SPLIT_PREFIX,
+    },
     raft::Storage,
     router::{PeerMsg, PeerTick, StoreMsg},
-    worker::{checkpoint, pd, tablet},
+    worker::{checkpoint, cleanup, pd, refresh_config, tablet},
     Error, Result,
 };
+
+const MIN_MANUAL_FLUSH_RATE: f64 = 0.3;
+const MAX_MANUAL_FLUSH_PERIOD: Duration = Duration::from_secs(60);
 
 /// A per-thread context shared by the [`StoreFsm`] and multiple [`PeerFsm`]s.
 pub struct StoreContext<EK: KvEngine, ER: RaftEngine, T> {
@@ -224,6 +229,16 @@ impl<EK: KvEngine, ER: RaftEngine, T: Transport + 'static> PollHandler<PeerFsm<E
     }
 
     fn handle_normal(&mut self, fsm: &mut impl DerefMut<Target = PeerFsm<EK, ER>>) -> HandleResult {
+        fail::fail_point!(
+            "pause_on_peer_collect_message",
+            fsm.deref_mut().peer().peer_id() == 1,
+            |_| unreachable!()
+        );
+        fail::fail_point!(
+            "on_peer_collect_message_2",
+            fsm.deref_mut().peer().peer_id() == 2,
+            |_| unreachable!()
+        );
         debug_assert!(self.peer_msg_buf.is_empty());
         let batch_size = self.messages_per_tick();
         let received_cnt = fsm.recv(&mut self.peer_msg_buf, batch_size);
@@ -277,6 +292,7 @@ impl<EK: KvEngine, ER: RaftEngine, T: Transport + 'static> PollHandler<PeerFsm<E
     }
 }
 
+#[derive(Clone)]
 struct StorePollerBuilder<EK: KvEngine, ER: RaftEngine, T> {
     cfg: Arc<VersionTrack<Config>>,
     coprocessor_host: CoprocessorHost<EK>,
@@ -415,7 +431,6 @@ impl<EK: KvEngine, ER: RaftEngine, T> StorePollerBuilder<EK, ER, T> {
                 continue;
             }
             let Some((prefix, region_id, tablet_index)) = self.tablet_registry.parse_tablet_name(&path) else { continue };
-            // Keep the checkpoint even if source is destroyed.
             if prefix == MERGE_SOURCE_PREFIX {
                 continue;
             }
@@ -498,6 +513,7 @@ pub struct Schedulers<EK: KvEngine, ER: RaftEngine> {
     pub tablet: Scheduler<tablet::Task<EK>>,
     pub checkpoint: Scheduler<checkpoint::Task<EK>>,
     pub write: WriteSenders<EK, ER>,
+    pub cleanup: Scheduler<cleanup::Task>,
 
     // Following is not maintained by raftstore itself.
     pub split_check: Scheduler<SplitCheckTask>,
@@ -522,6 +538,9 @@ struct Workers<EK: KvEngine, ER: RaftEngine> {
     checkpoint: Worker,
     async_write: StoreWriters<EK, ER>,
     purge: Option<Worker>,
+    cleanup_worker: Worker,
+
+    refresh_config_worker: LazyWorker<RefreshConfigTask>,
 
     // Following is not maintained by raftstore itself.
     background: Worker,
@@ -537,7 +556,9 @@ impl<EK: KvEngine, ER: RaftEngine> Workers<EK, ER> {
             checkpoint,
             async_write: StoreWriters::new(None),
             purge,
+            cleanup_worker: Worker::new("cleanup-worker"),
             background,
+            refresh_config_worker: LazyWorker::new("refreash-config-worker"),
         }
     }
 
@@ -547,6 +568,7 @@ impl<EK: KvEngine, ER: RaftEngine> Workers<EK, ER> {
         self.pd.stop();
         self.tablet.stop();
         self.checkpoint.stop();
+        self.refresh_config_worker.stop();
         if let Some(w) = self.purge {
             w.stop();
         }
@@ -603,12 +625,40 @@ impl<EK: KvEngine, ER: RaftEngine> StoreSystem<EK, ER> {
             let raft_clone = raft_engine.clone();
             let logger = self.logger.clone();
             let router = router.clone();
+            let registry = tablet_registry.clone();
+            let limiter = Limiter::new(MIN_MANUAL_FLUSH_RATE);
+            let mut max_rate = cfg.value().max_manual_flush_rate;
+            if max_rate < MIN_MANUAL_FLUSH_RATE {
+                max_rate = MIN_MANUAL_FLUSH_RATE;
+            }
             worker.spawn_interval_task(cfg.value().raft_engine_purge_interval.0, move || {
                 let _guard = WithIoType::new(IoType::RewriteLog);
                 match raft_clone.manual_purge() {
-                    Ok(regions) => {
+                    Ok(mut regions) => {
+                        if regions.is_empty() {
+                            return;
+                        }
+                        warn!(logger, "flushing oldest cf of regions {regions:?}");
+                        // Try to finish flush in 1m.
+                        let rate = regions.len() as f64 / MAX_MANUAL_FLUSH_PERIOD.as_secs_f64();
+                        let rate = rate.clamp(MIN_MANUAL_FLUSH_RATE, max_rate);
+                        limiter.set_speed_limit(rate);
+                        // Return early if there're too many regions.
+                        regions.truncate((rate * MAX_MANUAL_FLUSH_PERIOD.as_secs_f64()) as usize);
+                        // Skip tablets that are flushed elsewhere.
+                        let threshold = std::time::SystemTime::now() - Duration::from_secs(60 * 2);
                         for r in regions {
                             let _ = router.send(r, PeerMsg::ForceCompactLog);
+                            if let Some(mut t) = registry.get(r)
+                                && let Some(t) = t.latest()
+                            {
+                                if let Err(e) = t.flush_oldest_cf(true, Some(threshold)) {
+                                    warn!(logger, "failed to flush oldest cf"; "err" => %e);
+                                }
+                            } else {
+                                continue;
+                            }
+                            std::thread::sleep(limiter.consume_duration(1));
                         }
                     }
                     Err(e) => {
@@ -667,6 +717,12 @@ impl<EK: KvEngine, ER: RaftEngine> StoreSystem<EK, ER> {
             ),
         );
 
+        let compact_runner =
+            cleanup::CompactRunner::new(tablet_registry.clone(), self.logger.clone());
+        let cleanup_worker_scheduler = workers
+            .cleanup_worker
+            .start("cleanup-worker", cleanup::Runner::new(compact_runner));
+
         let checkpoint_scheduler = workers.checkpoint.start(
             "checkpoint-worker",
             checkpoint::Runner::new(self.logger.clone(), tablet_registry.clone()),
@@ -679,6 +735,7 @@ impl<EK: KvEngine, ER: RaftEngine> StoreSystem<EK, ER> {
             checkpoint: checkpoint_scheduler,
             write: workers.async_write.senders(),
             split_check: split_check_scheduler,
+            cleanup: cleanup_worker_scheduler,
         };
 
         let builder = StorePollerBuilder::new(
@@ -697,13 +754,21 @@ impl<EK: KvEngine, ER: RaftEngine> StoreSystem<EK, ER> {
             sst_importer,
             key_manager,
         );
-        self.workers = Some(workers);
+
         self.schedulers = Some(schedulers);
         let peers = builder.init()?;
         // Choose a different name so we know what version is actually used. rs stands
         // for raft store.
         let tag = format!("rs-{}", store_id);
-        self.system.spawn(tag, builder);
+        self.system.spawn(tag, builder.clone());
+
+        let refresh_config_runner = refresh_config::Runner::new(
+            self.logger.clone(),
+            router.router().clone(),
+            self.system.build_pool_state(builder),
+        );
+        assert!(workers.refresh_config_worker.start(refresh_config_runner));
+        self.workers = Some(workers);
 
         let mut mailboxes = Vec::with_capacity(peers.len());
         let mut address = Vec::with_capacity(peers.len());
@@ -728,11 +793,23 @@ impl<EK: KvEngine, ER: RaftEngine> StoreSystem<EK, ER> {
         router.register_all(mailboxes);
 
         // Make sure Msg::Start is the first message each FSM received.
+        let watch = Arc::new(ReplayWatch::new(self.logger.clone()));
         for addr in address {
-            router.force_send(addr, PeerMsg::Start).unwrap();
+            router
+                .force_send(addr, PeerMsg::Start(Some(watch.clone())))
+                .unwrap();
         }
         router.send_control(StoreMsg::Start).unwrap();
         Ok(())
+    }
+
+    pub fn refresh_config_scheduler(&mut self) -> Scheduler<RefreshConfigTask> {
+        assert!(self.workers.is_some());
+        self.workers
+            .as_ref()
+            .unwrap()
+            .refresh_config_worker
+            .scheduler()
     }
 
     pub fn shutdown(&mut self) {
@@ -799,6 +876,10 @@ impl<EK: KvEngine, ER: RaftEngine> StoreRouter<EK, ER> {
             }
             _ => unreachable!(),
         }
+    }
+
+    pub fn router(&self) -> &BatchRouter<PeerFsm<EK, ER>, StoreFsm> {
+        &self.router
     }
 }
 

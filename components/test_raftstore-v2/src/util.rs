@@ -9,22 +9,28 @@ use engine_traits::{CfName, KvEngine, TabletRegistry, CF_DEFAULT};
 use file_system::IoRateLimiter;
 use futures::future::BoxFuture;
 use kvproto::{
-    encryptionpb::EncryptionMethod, kvrpcpb::Context, metapb, raft_cmdpb::RaftCmdResponse,
+    encryptionpb::EncryptionMethod,
+    kvrpcpb::Context,
+    metapb,
+    raft_cmdpb::{CmdType, RaftCmdRequest, RaftCmdResponse},
 };
-use raftstore::Result;
+use raftstore::{store::ReadResponse, Result};
 use rand::{prelude::SliceRandom, RngCore};
 use server::common::ConfiguredRaftEngine;
 use tempfile::TempDir;
-use test_raftstore::{new_get_cmd, new_put_cf_cmd, new_request, Config};
+use test_raftstore::{new_get_cmd, new_put_cf_cmd, new_request, new_snap_cmd, Config};
 use tikv::{
     server::KvEngineFactoryBuilder,
     storage::{
         config::EngineType,
         kv::{SnapContext, SnapshotExt},
-        Engine, Snapshot,
+        point_key_range, Engine, Snapshot,
     },
 };
-use tikv_util::{config::ReadableDuration, worker::LazyWorker, HandyRwLock};
+use tikv_util::{
+    config::ReadableDuration, escape, future::block_on_timeout, worker::LazyWorker, HandyRwLock,
+};
+use txn_types::Key;
 
 use crate::{bootstrap_store, cluster::Cluster, ServerCluster, Simulator};
 
@@ -234,7 +240,7 @@ pub fn async_read_on_peer<T: Simulator<EK>, EK: KvEngine>(
     key: &[u8],
     read_quorum: bool,
     replica_read: bool,
-) -> BoxFuture<'static, Result<RaftCmdResponse>> {
+) -> BoxFuture<'static, RaftCmdResponse> {
     let mut request = new_request(
         region.get_id(),
         region.get_region_epoch().clone(),
@@ -243,8 +249,81 @@ pub fn async_read_on_peer<T: Simulator<EK>, EK: KvEngine>(
     );
     request.mut_header().set_peer(peer);
     request.mut_header().set_replica_read(replica_read);
-    let f = cluster.sim.wl().async_read(request);
-    Box::pin(async move { f.await })
+    let node_id = request.get_header().get_peer().get_store_id();
+    let f = cluster.sim.wl().async_read(node_id, request);
+    Box::pin(async move { f.await.unwrap() })
+}
+
+pub fn batch_read_on_peer<T: Simulator<EK>, EK: KvEngine>(
+    cluster: &mut Cluster<T, EK>,
+    requests: &[(metapb::Peer, metapb::Region)],
+) -> Vec<ReadResponse<<EK as KvEngine>::Snapshot>> {
+    let mut results = vec![];
+    for (peer, region) in requests {
+        let node_id = peer.get_store_id();
+        let mut request = new_request(
+            region.get_id(),
+            region.get_region_epoch().clone(),
+            vec![new_snap_cmd()],
+            false,
+        );
+        request.mut_header().set_peer(peer.clone());
+        let snap = cluster.sim.wl().async_snapshot(node_id, request);
+        let resp = block_on_timeout(
+            Box::pin(async move {
+                match snap.await {
+                    Ok(snap) => ReadResponse {
+                        response: Default::default(),
+                        snapshot: Some(snap),
+                        txn_extra_op: Default::default(),
+                    },
+                    Err(resp) => ReadResponse {
+                        response: resp,
+                        snapshot: None,
+                        txn_extra_op: Default::default(),
+                    },
+                }
+            }),
+            Duration::from_secs(1),
+        )
+        .unwrap();
+        results.push(resp);
+    }
+    results
+}
+
+pub fn async_read_index_on_peer<T: Simulator<EK>, EK: KvEngine>(
+    cluster: &mut Cluster<T, EK>,
+    peer: metapb::Peer,
+    region: metapb::Region,
+    key: &[u8],
+    read_quorum: bool,
+) -> BoxFuture<'static, RaftCmdResponse> {
+    let mut cmd = new_get_cmd(key);
+    cmd.mut_read_index().set_start_ts(u64::MAX);
+    cmd.mut_read_index()
+        .mut_key_ranges()
+        .push(point_key_range(Key::from_raw(key)));
+    let mut request = new_request(
+        region.get_id(),
+        region.get_region_epoch().clone(),
+        vec![cmd],
+        read_quorum,
+    );
+    // Use replica read to issue a read index.
+    request.mut_header().set_replica_read(true);
+    request.mut_header().set_peer(peer);
+    let node_id = request.get_header().get_peer().get_store_id();
+    let f = cluster.sim.wl().async_read(node_id, request);
+    Box::pin(async move { f.await.unwrap() })
+}
+
+pub fn async_command_on_node<T: Simulator<EK>, EK: KvEngine>(
+    cluster: &mut Cluster<T, EK>,
+    node_id: u64,
+    request: RaftCmdRequest,
+) -> BoxFuture<'static, RaftCmdResponse> {
+    cluster.sim.wl().async_command_on_node(node_id, request)
 }
 
 pub fn test_delete_range<T: Simulator<EK>, EK: KvEngine>(cluster: &mut Cluster<T, EK>, cf: CfName) {
@@ -278,4 +357,70 @@ pub fn test_delete_range<T: Simulator<EK>, EK: KvEngine>(cluster: &mut Cluster<T
         let k = &data_set.choose(&mut rng).unwrap().0;
         assert!(cluster.get_cf(cf, k).is_none());
     }
+}
+
+pub fn must_get_value(resp: &RaftCmdResponse) -> Vec<u8> {
+    if resp.get_header().has_error() {
+        panic!("failed to read {:?}", resp);
+    }
+    assert_eq!(resp.get_responses().len(), 1);
+    assert_eq!(resp.get_responses()[0].get_cmd_type(), CmdType::Get);
+    assert!(resp.get_responses()[0].has_get());
+    resp.get_responses()[0].get_get().get_value().to_vec()
+}
+
+pub fn must_read_on_peer<T: Simulator<EK>, EK: KvEngine>(
+    cluster: &mut Cluster<T, EK>,
+    peer: metapb::Peer,
+    region: metapb::Region,
+    key: &[u8],
+    value: &[u8],
+) {
+    let timeout = Duration::from_secs(5);
+    match read_on_peer(cluster, peer, region, key, false, timeout) {
+        Ok(ref resp) if value == must_get_value(resp).as_slice() => (),
+        other => panic!(
+            "read key {}, expect value {:?}, got {:?}",
+            log_wrappers::hex_encode_upper(key),
+            value,
+            other
+        ),
+    }
+}
+
+pub fn must_error_read_on_peer<T: Simulator<EK>, EK: KvEngine>(
+    cluster: &mut Cluster<T, EK>,
+    peer: metapb::Peer,
+    region: metapb::Region,
+    key: &[u8],
+    timeout: Duration,
+) {
+    if let Ok(mut resp) = read_on_peer(cluster, peer, region, key, false, timeout) {
+        if !resp.get_header().has_error() {
+            let value = resp.mut_responses()[0].mut_get().take_value();
+            panic!(
+                "key {}, expect error but got {}",
+                log_wrappers::hex_encode_upper(key),
+                escape(&value)
+            );
+        }
+    }
+}
+
+pub fn put_with_timeout<T: Simulator<EK>, EK: KvEngine>(
+    cluster: &mut Cluster<T, EK>,
+    node_id: u64,
+    key: &[u8],
+    value: &[u8],
+    timeout: Duration,
+) -> Result<RaftCmdResponse> {
+    let mut region = cluster.get_region(key);
+    let region_id = region.get_id();
+    let req = new_request(
+        region_id,
+        region.take_region_epoch(),
+        vec![new_put_cf_cmd(CF_DEFAULT, key, value)],
+        false,
+    );
+    cluster.call_command_on_node(node_id, req, timeout)
 }
