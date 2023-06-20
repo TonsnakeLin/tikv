@@ -314,6 +314,7 @@ impl PeerMsg {
                     epoch,
                     split_keys,
                     source: source.into(),
+                    encrypt: 0,
                 },
                 ch,
             },

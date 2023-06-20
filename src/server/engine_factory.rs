@@ -231,6 +231,7 @@ impl KvEngineFactory {
 
 impl TabletFactory<RocksEngine> for KvEngineFactory {
     fn open_tablet(&self, ctx: TabletContext, path: &Path, use_encryp_env: bool) -> Result<RocksEngine> {
+        /*
         let res = self.open_tablet_basic(ctx.clone(), path, use_encryp_env);
         if res.is_ok() {
             return res;
@@ -239,7 +240,7 @@ impl TabletFactory<RocksEngine> for KvEngineFactory {
             "path" => %path.display(), 
             "use_encryp_env" => ?use_encryp_env);
         return self.open_tablet_basic(ctx, path, !use_encryp_env);
-        /*
+        */        
         let mut db_opts = self.db_opts(EngineType::RaftKv2, use_encryp_env);
         let tablet_name = path.file_name().unwrap().to_str().unwrap().to_string();
         db_opts.set_info_log(TabletLogger::new(tablet_name));
@@ -265,8 +266,7 @@ impl TabletFactory<RocksEngine> for KvEngineFactory {
         } else if let Some(listener) = &self.inner.flow_listener {
             listener.clone_with(ctx.id).on_created();
         }
-        kv_engine
-        */
+        kv_engine        
     } 
 
     // todo: add the param `use_encryp_env` 
