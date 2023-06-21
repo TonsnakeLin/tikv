@@ -281,13 +281,13 @@ impl Store {
                     m.set_term(raftstore::store::RAFT_INIT_LOG_TERM);
                     m.set_index(raftstore::store::RAFT_INIT_LOG_INDEX);
                     assert!(util::is_initial_msg(initial_msg.get_message()));
-                    self.on_raft_message(ctx, initial_msg);
+                    self.on_raft_message(ctx, initial_msg, encrypted);
                 }
             )
         })();
 
         // It will create the peer if it does not exist
-        self.on_raft_message(ctx, raft_msg);
+        self.on_raft_message(ctx, raft_msg, encrypted);
 
         if let Err(SendError(m)) = ctx.router.force_send(region_id, PeerMsg::SplitInit(msg)) {
             warn!(
@@ -316,7 +316,8 @@ impl Store {
         raft_msg.set_to_peer(req.get_header().get_peer().clone());
 
         // It will create the peer if it does not exist
-        self.on_raft_message(ctx, raft_msg);
+        // todo: check the encryption of the merged region.
+        self.on_raft_message(ctx, raft_msg, false);
 
         if let Err(SendError(PeerMsg::AskCommitMerge(req))) = ctx
             .router
@@ -341,6 +342,7 @@ impl Store {
         &mut self,
         ctx: &mut StoreContext<EK, ER, T>,
         msg: Box<RaftMessage>,
+        encrypted_region: bool,
     ) where
         EK: KvEngine,
         ER: RaftEngine,
@@ -418,6 +420,7 @@ impl Store {
         let mut region = Region::default();
         region.set_id(region_id);
         region.set_region_epoch(msg.get_region_epoch().clone());
+        region.set_is_encrypted_region(encrypted_region);
 
         // Peer list doesn't have to be complete, as it's uninitialized.
         //
