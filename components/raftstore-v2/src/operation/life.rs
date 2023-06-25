@@ -295,7 +295,8 @@ impl Store {
                 "Split peer is destroyed before sending the intialization msg";
                 "split init msg" => ?m,
             );
-            report_split_init_finish(ctx, derived_region_id, region_id, true, encrypted);
+            report_split_init_finish(ctx, derived_region_id, region_id, 
+                true, super::is_encrypted_region(encrypted));
         }
     }
 
