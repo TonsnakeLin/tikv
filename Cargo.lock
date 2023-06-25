@@ -2960,7 +2960,7 @@ dependencies = [
 [[package]]
 name = "kvproto"
 version = "0.0.2"
-source = "git+https://github.com/TonsnakeLin/kvproto?branch=table-encryption-dev#c649fadef73a2347923fdd0a5d8e7837de7268d2"
+source = "git+https://github.com/TonsnakeLin/kvproto?branch=table-encryption-dev#d507149947c16e773395924d1603ace814a1c5a6"
 dependencies = [
  "futures 0.3.15",
  "grpcio",
