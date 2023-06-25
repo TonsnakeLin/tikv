@@ -449,7 +449,7 @@ impl<EK: KvEngine, ER: RaftEngine> Storage<EK, ER> {
             return;
         }
         let region_id = self.region().get_id();
-        let is_encrypted = self.region().get_is_encrypted_region();
+        let is_encrypted = super::super::is_encrypted_region(self.region().get_encrypted_region());
         let target_path = registry.tablet_path(region_id, tablet_index);
         if target_path.exists() {
             // Move data succeeded before restart, nothing to recover.

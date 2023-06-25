@@ -36,7 +36,8 @@ use raftstore::{
 use slog::{error, info};
 use split::SplitResult;
 pub use split::{
-    report_split_init_finish, temp_split_path, RequestHalfSplit, RequestSplit, SplitFlowControl,
+    is_encrypted_region, report_split_init_finish, temp_split_path, ENCRYPTED_REGION_BIT_MASK, ENCRYPTED_SPLITED_STABLE_REGION_BIT_MASK,
+    RequestHalfSplit, RequestSplit, SplitFlowControl,
     SplitInit, SplitPendingAppend, SPLIT_PREFIX, SPLIT_DERIVED_REGION_ENCRYPTED, SPLIT_REQUEST_FROM_TIDB_CREATE_TABLE,
     SPLIT_REQUEST_FROM_PD_HEARTBEAT, SPLIT_REQUEST_FROM_TIKV_AUTOSPLIT,
 };

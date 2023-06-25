@@ -15,7 +15,7 @@ use raftstore::{
         Transport, RAFT_INIT_LOG_INDEX,
     },
 };
-use raftstore_v2::{router::RaftRouter, Bootstrap, PdTask, StoreRouter, StoreSystem};
+use raftstore_v2::{operation::is_encrypted_region, router::RaftRouter, Bootstrap, PdTask, StoreRouter, StoreSystem};
 use resource_metering::CollectorRegHandle;
 use slog::{info, o, Logger};
 use sst_importer::SstImporter;
@@ -120,10 +120,14 @@ where
         .bootstrap_first_region(&self.store, store_id)?
         {
             let path = registry.tablet_path(region.get_id(), RAFT_INIT_LOG_INDEX);
-            let ctx = TabletContext::new(&region, Some(RAFT_INIT_LOG_INDEX),region.get_is_encrypted_region());
+            let ctx = TabletContext::new(&region, 
+                Some(RAFT_INIT_LOG_INDEX),
+                is_encrypted_region(region.get_encrypted_region()));
             // TODO: make follow line can recover from abort.
-            // TODO: if region.get_is_encrypted_region() is true, key_manager must exist.
-            registry.tablet_factory().open_tablet(ctx, &path, region.get_is_encrypted_region()).unwrap();
+            // TODO: if region.get_encrypted_region() is true, key_manager must exist.
+            registry.tablet_factory().open_tablet(ctx, 
+                &path, 
+                is_encrypted_region(region.get_encrypted_region())).unwrap();
         }
 
         // Put store only if the cluster is bootstrapped.

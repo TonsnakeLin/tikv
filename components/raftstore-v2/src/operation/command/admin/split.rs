@@ -82,6 +82,10 @@ pub const SPLIT_REQUEST_FROM_TIKV_AUTOSPLIT: u32 = 0x0008;
 // bit0, used by tidb-server, indicate that whether ther derived region needs to be encrypted
 pub const SPLIT_DERIVED_REGION_ENCRYPTED: u32 = 0x0001;
 
+pub const ENCRYPTED_REGION_BIT_MASK: u32 = 0x00000001;
+pub const ENCRYPTED_SPLITED_STABLE_REGION_BIT_MASK: u32 = 0x10000001;
+pub const SPLITED_STABLE_REGION_BIT_MASK: u32 = 0x10000000;
+
 #[derive(Debug)]
 pub struct SplitResult {
     pub regions: Vec<Region>,
@@ -125,6 +129,19 @@ impl SplitInit {
         snapshot.set_data(snap_data.write_to_bytes().unwrap().into());
         snapshot
     }
+}
+
+// It will be an encrypted region when the following conditions are met.
+// 1. the encrypted flag is set
+// 2. it's not the splited-stable region
+pub fn is_encrypted_region(flag: u32) -> bool {
+    if flag & ENCRYPTED_REGION_BIT_MASK == 0 {
+        return false;
+    }
+    if flag & SPLITED_STABLE_REGION_BIT_MASK > 0 {
+        return false;
+    }
+    return true;
 }
 
 pub fn report_split_init_finish<EK, ER, T>(
@@ -453,7 +470,7 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
 
         let region = self.region();
         let region_id = region.get_id();
-        let region_was_encrypted = region.get_is_encrypted_region();
+        let region_was_encrypted = region.get_encrypted_region() & ENCRYPTED_REGION_BIT_MASK;
         validate_batch_split(req, self.region())?;
 
         let mut boundaries: Vec<&[u8]> = Vec::default();
@@ -496,7 +513,7 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
                 new_region.set_id(req.get_new_region_id());
                 new_region.set_region_epoch(region.get_region_epoch().to_owned());
                 new_region.mut_region_epoch().set_version(new_version);
-                new_region.set_is_encrypted_region(region_was_encrypted);
+                new_region.set_encrypted_region(region_was_encrypted);
                 new_region.set_start_key(start_key.to_vec());
                 new_region.set_end_key(end_key.to_vec());
                 new_region.set_peers(region.get_peers().to_vec().into());
@@ -519,12 +536,12 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
         let derived_index = if right_derive { regions.len() - 1 } else { 0 };
         if req_encrypt_flag & SPLIT_REQUEST_FROM_TIDB_CREATE_TABLE == 0x8000 as u32 {
             if req_encrypt_flag & SPLIT_DERIVED_REGION_ENCRYPTED == 0x0001 as u32  {
-                regions[derived_index].set_is_encrypted_region(true);
+                regions[derived_index].set_encrypted_region(ENCRYPTED_SPLITED_STABLE_REGION_BIT_MASK);
             } else {
-                regions[derived_index].set_is_encrypted_region(false);
+                regions[derived_index].set_encrypted_region(0 as u32);
             }            
         }
-        let req_encrypt_region = regions[derived_index].get_is_encrypted_region();
+        let encrypt_derived_region = is_encrypted_region(regions[derived_index].get_encrypted_region());
 
         // We will create checkpoint of the current tablet for both derived region and
         // split regions. Before the creation, we should flush the writes and remove the
@@ -552,17 +569,17 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
             "region" =>  ?self.region(),
             "checkpoint_duration" => ?checkpoint_duration,
             "total_duration" => ?elapsed,
-            "derived_region_is_encrypted" => ?req_encrypt_region,
+            "derived_region_is_encrypted" => ?encrypt_derived_region,
         );
 
         let reg = self.tablet_registry();
         let path = reg.tablet_path(region_id, log_index);
-        let mut ctx = TabletContext::new(&regions[derived_index], Some(log_index), req_encrypt_region);
+        let mut ctx = TabletContext::new(&regions[derived_index], Some(log_index), encrypt_derived_region);
         // Now the tablet is flushed, so all previous states should be persisted.
         // Reusing the tablet should not be a problem.
         // TODO: Should we avoid flushing for the old tablet?
         ctx.flush_state = Some(self.flush_state().clone());
-        let tablet = reg.tablet_factory().open_tablet(ctx, &path, req_encrypt_region).unwrap();
+        let tablet = reg.tablet_factory().open_tablet(ctx, &path, encrypt_derived_region).unwrap();
         self.set_tablet(tablet.clone());
 
         self.region_state_mut()
@@ -807,7 +824,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
         {
             // Race with split operation. The tablet created by split will eventually be
             // deleted. We don't trim it.
-            let encryptd = split_init.region.get_is_encrypted_region();
+            let encryptd = is_encrypted_region(split_init.region.get_encrypted_region());
             report_split_init_finish(store_ctx, split_init.derived_region_id, region_id, true, encryptd);
             return;
         }
@@ -888,7 +905,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
         if split_init.check_split {
             self.add_pending_tick(PeerTick::SplitRegionCheck);
         }
-        let encrypted = self.region().get_is_encrypted_region();
+        let encrypted = is_encrypted_region(self.region().get_encrypted_region());
         report_split_init_finish(store_ctx, split_init.derived_region_id, region_id, false, encrypted);
     }
 

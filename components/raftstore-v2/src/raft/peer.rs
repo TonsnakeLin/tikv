@@ -34,6 +34,7 @@ use super::storage::Storage;
 use crate::{
     fsm::ApplyScheduler,
     operation::{
+        is_encrypted_region,
         AbnormalPeerContext, AsyncWriter, BucketStatsInfo, CompactLogContext, DestroyProgress,
         GcPeerContext, MergeContext, ProposalControl, ReplayWatch, SimpleWriteReqEncoder,
         SplitFlowControl, SplitPendingAppend, TxnContext,
@@ -161,10 +162,12 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
             raft_group
                 .store()
                 .recover_tablet(tablet_registry, key_manager, snap_mgr);
-            let mut ctx = TabletContext::new(&region, Some(tablet_index), region.get_is_encrypted_region());
+            let mut ctx = TabletContext::new(&region, 
+                Some(tablet_index), 
+                is_encrypted_region(region.get_encrypted_region()));
             ctx.flush_state = Some(flush_state.clone());
             // TODO: Perhaps we should stop create the tablet automatically.
-            tablet_registry.load(ctx, false, region.get_is_encrypted_region())?;
+            tablet_registry.load(ctx, false, is_encrypted_region(region.get_encrypted_region()))?;
         }
         let cached_tablet = tablet_registry.get_or_default(region_id);
 
@@ -254,7 +257,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
 
     #[inline]
     pub fn is_encrypted_region(&self) -> bool {
-        self.region().get_is_encrypted_region()
+        is_encrypted_region(self.region().get_encrypted_region())
     }
 
     /// Set the region of a peer.

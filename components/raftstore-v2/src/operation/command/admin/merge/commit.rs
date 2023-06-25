@@ -82,6 +82,8 @@ use tikv_util::{
 };
 
 use super::merge_source_path;
+use super::super::is_encrypted_region;
+
 use crate::{
     batch::StoreContext,
     fsm::ApplyResReporter,
@@ -257,7 +259,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
         let merge = req.get_admin_request().get_commit_merge();
         assert!(merge.has_source_state() && merge.get_source_state().has_merge_state());
         let source_region = merge.get_source_state().get_region();
-        let source_encrypted = source_region.get_is_encrypted_region();
+        let source_encrypted = is_encrypted_region(source_region.get_encrypted_region());
         let region = self.region();
         if let Some(r) = self
             .storage()
@@ -402,10 +404,12 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
             "source_region" => ?source_region,
         );
 
-        let ctx = TabletContext::new(source_region, None, source_region.get_is_encrypted_region());
+        let ctx = TabletContext::new(source_region, 
+            None, 
+            is_encrypted_region(source_region.get_encrypted_region()));
         let source_tablet = reg
             .tablet_factory()
-            .open_tablet(ctx, &source_path, source_region.get_is_encrypted_region())
+            .open_tablet(ctx, &source_path, is_encrypted_region(source_region.get_encrypted_region()))
             .unwrap_or_else(|e| {
                 slog_panic!(self.logger, "failed to open source checkpoint"; "err" => ?e);
             });
@@ -431,7 +435,9 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
         self.tablet().flush_cfs(&[], true).unwrap();
         let flush_time = Instant::now_coarse();
 
-        let mut ctx = TabletContext::new(&region, Some(index), region.get_is_encrypted_region());
+        let mut ctx = TabletContext::new(&region, 
+            Some(index), 
+            is_encrypted_region(region.get_encrypted_region()));
         ctx.flush_state = Some(self.flush_state().clone());
         let guard = MergeInProgressGuard::new(&self.logger, reg, self.region_id(), index, &path)
             .unwrap_or_else(|e| {
@@ -442,7 +448,8 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
                     "error" => ?e
                 )
             });
-        let tablet = reg.tablet_factory().open_tablet(ctx, &path, region.get_is_encrypted_region()).unwrap();
+        let tablet = reg.tablet_factory().open_tablet(ctx, &path, 
+            is_encrypted_region(region.get_encrypted_region())).unwrap();
         if let Some(guard) = guard {
             tablet
                 .merge(&[&source_tablet, self.tablet()])
@@ -689,7 +696,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
         store_ctx: &mut StoreContext<EK, ER, T>,
         mut res: CommitMergeResult,
     ) {
-        let source_encrypted = res.source.get_is_encrypted_region();
+        let source_encrypted = is_encrypted_region(res.source.get_encrypted_region());
         let region = res.region_state.get_region();
         assert!(
             res.source.get_end_key() == region.get_end_key()

@@ -51,7 +51,7 @@ use tikv_util::{box_err, log::SlogFormat, slog_panic};
 
 use crate::{
     fsm::ApplyResReporter,
-    operation::{command::temp_split_path, SharedReadTablet},
+    operation::{command::temp_split_path, SharedReadTablet, is_encrypted_region},
     raft::{Apply, Peer, Storage},
     router::ApplyTask,
     worker::tablet,
@@ -244,7 +244,9 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
             let region_id = self.region_id();
             self.reset_flush_state(snapshot_index);
             let flush_state = self.flush_state().clone();
-            let mut tablet_ctx = TabletContext::new(self.region(), Some(snapshot_index), self.region().get_is_encrypted_region());
+            let mut tablet_ctx = TabletContext::new(self.region(), 
+            Some(snapshot_index), 
+            is_encrypted_region(self.region().get_encrypted_region()));
             // Use a new FlushState to avoid conflicts with the old one.
             tablet_ctx.flush_state = Some(flush_state);
             let path = ctx.tablet_registry.tablet_path(region_id, snapshot_index);
@@ -257,7 +259,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
             let tablet = ctx
                 .tablet_registry
                 .tablet_factory()
-                .open_tablet(tablet_ctx, &path, self.region().get_is_encrypted_region())
+                .open_tablet(tablet_ctx, &path, is_encrypted_region(self.region().get_encrypted_region()))
                 .unwrap_or_else(|e| {
                     slog_panic!(
                         self.logger,
@@ -577,7 +579,7 @@ impl<EK: KvEngine, ER: RaftEngine> Storage<EK, ER> {
     ) -> Result<()> {
         let region_id = self.region().get_id();
         let peer_id = self.peer().get_id();
-        let is_encrypted = self.region().get_is_encrypted_region();
+        let is_encrypted = is_encrypted_region(self.region().get_encrypted_region());
         info!(
             self.logger(),
             "begin to apply snapshot";

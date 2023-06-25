@@ -23,7 +23,7 @@ use raftstore::{
     coprocessor::{get_region_approximate_middle, get_region_approximate_size},
     store::util::check_key_in_region,
 };
-use raftstore_v2::Storage;
+use raftstore_v2::{operation::is_encrypted_region, Storage};
 use slog::o;
 use tikv_util::{
     config::ReadableSize, store::find_peer, sys::thread::StdThreadBuildWrapper, worker::Worker,
@@ -975,7 +975,7 @@ fn get_tablet_cache(
         Ok(tablet_cache)
     } else {
         let region_state = state.unwrap();
-        let is_encrypted = region_state.get_region().get_is_encrypted_region();
+        let is_encrypted = is_encrypted_region(region_state.get_region().get_encrypted_region());
         let ctx = TabletContext::new(region_state.get_region(), Some(region_state.tablet_index), is_encrypted);
         match tablet_reg.load(ctx, false, is_encrypted) {
             Ok(tablet_cache) => Ok(tablet_cache),

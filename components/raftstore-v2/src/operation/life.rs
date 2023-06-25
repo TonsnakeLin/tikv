@@ -259,7 +259,7 @@ impl Store {
     {
         let derived_region_id = msg.derived_region_id;
         let region_id = msg.region.id;
-        let encrypted = msg.region.get_is_encrypted_region();
+        let encrypted = super::is_encrypted_region(msg.region.get_encrypted_region());
         let raft_msg = empty_split_message(self.store_id(), &msg.region);
 
         (|| {

@@ -379,7 +379,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
                 old_tablet,
                 self.region_id(),
                 new_tablet_index,
-                self.region().get_is_encrypted_region(),
+                super::is_encrypted_region(self.region().get_encrypted_region()),
                 cb,
             ));
     }
@@ -432,7 +432,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
             tablet,
             self.region_id(),
             applied_index,
-            self.region().get_is_encrypted_region(),
+            super::is_encrypted_region(self.region().get_encrypted_region()),
         ));
         task.persisted_cbs.push(Box::new(move || {
             let _ = sched.schedule(tablet::Task::destroy(region_id, applied_index));

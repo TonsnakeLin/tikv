@@ -66,7 +66,7 @@ mod control;
 mod write;
 
 pub use admin::{
-    merge_source_path, report_split_init_finish, temp_split_path, AdminCmdResult, CatchUpLogs,
+    is_encrypted_region, merge_source_path, report_split_init_finish, temp_split_path, AdminCmdResult, CatchUpLogs,
     CompactLogContext, MergeContext, RequestHalfSplit, RequestSplit, SplitFlowControl, SplitInit,
     SplitPendingAppend, MERGE_IN_PROGRESS_PREFIX, MERGE_SOURCE_PREFIX, SPLIT_PREFIX,
     SPLIT_REQUEST_FROM_PD_HEARTBEAT, SPLIT_REQUEST_FROM_TIKV_AUTOSPLIT,
