@@ -23,7 +23,7 @@ use raftstore::{
     coprocessor::{get_region_approximate_middle, get_region_approximate_size},
     store::util::check_key_in_region,
 };
-use raftstore_v2::{operation::is_encrypted_region, Storage};
+use raftstore_v2::{is_encrypted_region, Storage};
 use slog::o;
 use tikv_util::{
     config::ReadableSize, store::find_peer, sys::thread::StdThreadBuildWrapper, worker::Worker,

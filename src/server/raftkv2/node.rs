@@ -15,7 +15,7 @@ use raftstore::{
         Transport, RAFT_INIT_LOG_INDEX,
     },
 };
-use raftstore_v2::{operation::is_encrypted_region, router::RaftRouter, Bootstrap, PdTask, StoreRouter, StoreSystem};
+use raftstore_v2::{is_encrypted_region, router::RaftRouter, Bootstrap, PdTask, StoreRouter, StoreSystem};
 use resource_metering::CollectorRegHandle;
 use slog::{info, o, Logger};
 use sst_importer::SstImporter;

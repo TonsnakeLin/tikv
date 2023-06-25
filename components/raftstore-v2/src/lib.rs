@@ -40,7 +40,7 @@ pub(crate) use batch::StoreContext;
 pub use batch::{create_store_batch_system, StoreRouter, StoreSystem};
 pub use bootstrap::Bootstrap;
 pub use fsm::StoreMeta;
-pub use operation::{write_initial_states, SimpleWriteBinary, SimpleWriteEncoder, StateStorage};
+pub use operation::{is_encrypted_region, write_initial_states, SimpleWriteBinary, SimpleWriteEncoder, StateStorage};
 pub use raftstore::{store::Config, Error, Result};
 pub use worker::{
     cleanup::CompactTask,
