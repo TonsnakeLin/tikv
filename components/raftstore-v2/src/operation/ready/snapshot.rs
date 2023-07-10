@@ -259,7 +259,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
             let tablet = ctx
                 .tablet_registry
                 .tablet_factory()
-                .open_tablet(tablet_ctx, &path, is_encrypted_region(self.region().get_encrypted_region()))
+                .open_tablet(tablet_ctx, &path)
                 .unwrap_or_else(|e| {
                     slog_panic!(
                         self.logger,

@@ -977,7 +977,7 @@ fn get_tablet_cache(
         let region_state = state.unwrap();
         let is_encrypted = is_encrypted_region(region_state.get_region().get_encrypted_region());
         let ctx = TabletContext::new(region_state.get_region(), Some(region_state.tablet_index), is_encrypted);
-        match tablet_reg.load(ctx, false, is_encrypted) {
+        match tablet_reg.load(ctx, false) {
             Ok(tablet_cache) => Ok(tablet_cache),
             Err(e) => {
                 println!(
@@ -1201,7 +1201,7 @@ mod tests {
         state.set_tablet_index(5);
 
         let ctx = TabletContext::new(&region, Some(5), false);
-        let mut tablet_cache = debugger.tablet_reg.load(ctx, true, false).unwrap();
+        let mut tablet_cache = debugger.tablet_reg.load(ctx, true).unwrap();
         let tablet = tablet_cache.latest().unwrap();
 
         let mut wb = raft_engine.log_batch(10);
@@ -1304,7 +1304,7 @@ mod tests {
         state.set_tablet_index(5);
 
         let ctx = TabletContext::new(&region, Some(5), false);
-        let mut tablet_cache = debugger.tablet_reg.load(ctx, true, false).unwrap();
+        let mut tablet_cache = debugger.tablet_reg.load(ctx, true).unwrap();
         let tablet = tablet_cache.latest().unwrap();
 
         let mut wb = raft_engine.log_batch(10);
@@ -1580,7 +1580,7 @@ mod tests {
             region.set_peers(vec![new_peer(1, i + 1)].into());
             region.set_id(i + 1);
             let ctx = TabletContext::new(&region, Some(5), false);
-            let mut cache = debugger.tablet_reg.load(ctx, true, false).unwrap();
+            let mut cache = debugger.tablet_reg.load(ctx, true).unwrap();
             let tablet = cache.latest().unwrap();
             for j in 0..10 {
                 // (6 + 3) * 10
@@ -1624,7 +1624,7 @@ mod tests {
             region.set_peers(vec![new_peer(1, i + 1)].into());
             region.set_id(i + 1);
             let ctx = TabletContext::new(&region, Some(5), false);
-            let mut cache = debugger.tablet_reg.load(ctx, true, false).unwrap();
+            let mut cache = debugger.tablet_reg.load(ctx, true).unwrap();
             let tablet = cache.latest().unwrap();
             for j in 0..=i {
                 let k = format!("zk{:04}", i * 100 + j);

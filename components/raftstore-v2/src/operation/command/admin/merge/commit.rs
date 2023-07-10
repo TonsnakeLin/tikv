@@ -409,7 +409,7 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
             is_encrypted_region(source_region.get_encrypted_region()));
         let source_tablet = reg
             .tablet_factory()
-            .open_tablet(ctx, &source_path, is_encrypted_region(source_region.get_encrypted_region()))
+            .open_tablet(ctx, &source_path)
             .unwrap_or_else(|e| {
                 slog_panic!(self.logger, "failed to open source checkpoint"; "err" => ?e);
             });
@@ -448,8 +448,7 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
                     "error" => ?e
                 )
             });
-        let tablet = reg.tablet_factory().open_tablet(ctx, &path, 
-            is_encrypted_region(region.get_encrypted_region())).unwrap();
+        let tablet = reg.tablet_factory().open_tablet(ctx, &path).unwrap();
         if let Some(guard) = guard {
             tablet
                 .merge(&[&source_tablet, self.tablet()])

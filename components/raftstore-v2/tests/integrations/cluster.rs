@@ -308,7 +308,7 @@ impl RunningState {
                 factory.destroy_tablet(ctx.clone(), &path).unwrap();
             }
             // Create the tablet without loading it in cache.
-            factory.open_tablet(ctx, &path, false).unwrap();
+            factory.open_tablet(ctx, &path).unwrap();
         }
 
         let router = RaftRouter::new(store_id, router);

@@ -579,7 +579,7 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
         // Reusing the tablet should not be a problem.
         // TODO: Should we avoid flushing for the old tablet?
         ctx.flush_state = Some(self.flush_state().clone());
-        let tablet = reg.tablet_factory().open_tablet(ctx, &path, encrypt_derived_region).unwrap();
+        let tablet = reg.tablet_factory().open_tablet(ctx, &path).unwrap();
         self.set_tablet(tablet.clone());
 
         self.region_state_mut()
@@ -1123,7 +1123,7 @@ mod test {
         let factory = Box::new(TestTabletFactory::new(DbOptions::default(), cf_opts));
         let reg = TabletRegistry::new(factory, path.path()).unwrap();
         let ctx = TabletContext::new(&region, Some(5), false);
-        reg.load(ctx, true, false).unwrap();
+        reg.load(ctx, true).unwrap();
 
         let mut region_state = RegionLocalState::default();
         region_state.set_state(PeerState::Normal);

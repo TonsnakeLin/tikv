@@ -119,7 +119,7 @@ pub mod kv {
     }
 
     impl TabletFactory<KvTestEngine> for TestTabletFactory {
-        fn open_tablet(&self, ctx: TabletContext, path: &Path, _use_encryp_env: bool) -> Result<KvTestEngine> {
+        fn open_tablet(&self, ctx: TabletContext, path: &Path) -> Result<KvTestEngine> {
             KvTestEngine::new_tablet(
                 path.to_str().unwrap(),
                 ctx,

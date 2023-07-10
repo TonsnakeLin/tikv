@@ -230,18 +230,8 @@ impl KvEngineFactory {
 }
 
 impl TabletFactory<RocksEngine> for KvEngineFactory {
-    fn open_tablet(&self, ctx: TabletContext, path: &Path, use_encryp_env: bool) -> Result<RocksEngine> {
-        /*
-        let res = self.open_tablet_basic(ctx.clone(), path, use_encryp_env);
-        if res.is_ok() {
-            return res;
-        }
-        error!("failed to open_tablet tablet, will reopen it with the opposite of use_encryp_env"; 
-            "path" => %path.display(), 
-            "use_encryp_env" => ?use_encryp_env);
-        return self.open_tablet_basic(ctx, path, !use_encryp_env);
-        */        
-        let mut db_opts = self.db_opts(EngineType::RaftKv2, use_encryp_env);
+    fn open_tablet(&self, ctx: TabletContext, path: &Path) -> Result<RocksEngine> {       
+        let mut db_opts = self.db_opts(EngineType::RaftKv2, ctx.is_encrypted);
         let tablet_name = path.file_name().unwrap().to_str().unwrap().to_string();
         db_opts.set_info_log(TabletLogger::new(tablet_name));
         let factory = RangeCompactionFilterFactory::new(ctx.start_key.clone(), ctx.end_key.clone());
@@ -344,12 +334,12 @@ mod tests {
         let mut tablet_ctx = TabletContext::with_infinite_region(1, Some(3), false);
         let engine = reg
             .tablet_factory()
-            .open_tablet(tablet_ctx.clone(), &path, false)
+            .open_tablet(tablet_ctx.clone(), &path)
             .unwrap();
         assert!(reg.tablet_factory().exists(&path));
         // Second attempt should fail with lock.
         reg.tablet_factory()
-            .open_tablet(tablet_ctx.clone(), &path, false)
+            .open_tablet(tablet_ctx.clone(), &path)
             .unwrap_err();
         drop(engine);
         tablet_ctx.suffix = Some(3);
@@ -371,7 +361,7 @@ mod tests {
         };
         let tablet_ctx = TabletContext::new(&region, Some(3), false);
         let path = reg.tablet_path(1, 3);
-        let engine = reg.tablet_factory().open_tablet(tablet_ctx, &path, false).unwrap();
+        let engine = reg.tablet_factory().open_tablet(tablet_ctx, &path).unwrap();
         engine.put(&keys::data_key(b"k0"), b"v0").unwrap();
         engine.put(&keys::data_key(b"k1"), b"v1").unwrap();
         engine.put(&keys::data_key(b"k2"), b"v2").unwrap();

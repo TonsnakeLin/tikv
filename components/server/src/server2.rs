@@ -1415,7 +1415,7 @@ mod test {
 
         for i in 1..6 {
             let ctx = TabletContext::with_infinite_region(i, Some(10), false);
-            reg.load(ctx, true, false).unwrap();
+            reg.load(ctx, true).unwrap();
         }
 
         let mut cached = reg.get(1).unwrap();
@@ -1434,7 +1434,7 @@ mod test {
             .unwrap();
 
         let ctx = TabletContext::with_infinite_region(1, Some(20), false);
-        reg.load(ctx, true, false).unwrap();
+        reg.load(ctx, true).unwrap();
         tablet = cached.latest().unwrap();
 
         for i in 1..11 {

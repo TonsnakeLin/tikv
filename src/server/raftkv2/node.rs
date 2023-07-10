@@ -126,8 +126,7 @@ where
             // TODO: make follow line can recover from abort.
             // TODO: if region.get_encrypted_region() is true, key_manager must exist.
             registry.tablet_factory().open_tablet(ctx, 
-                &path, 
-                is_encrypted_region(region.get_encrypted_region())).unwrap();
+                &path).unwrap();
         }
 
         // Put store only if the cluster is bootstrapped.

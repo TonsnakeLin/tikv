@@ -128,7 +128,7 @@ pub fn get_env(
     let env = file_system::get_env(Some(env1), limiter.clone())?;
 
     let env2 = encryption::get_env(None , None)?;
-    let env_no_encrp = file_system::get_env(Some(env2), limiter)?;
+    let env_no_encryp = file_system::get_env(Some(env2), limiter)?;
     
-    return Ok((Some(env), Some(env_no_encrp)))
+    return Ok((Some(env), Some(env_no_encryp)))
 }

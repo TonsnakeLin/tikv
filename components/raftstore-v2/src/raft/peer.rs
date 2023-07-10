@@ -167,7 +167,7 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
                 is_encrypted_region(region.get_encrypted_region()));
             ctx.flush_state = Some(flush_state.clone());
             // TODO: Perhaps we should stop create the tablet automatically.
-            tablet_registry.load(ctx, false, is_encrypted_region(region.get_encrypted_region()))?;
+            tablet_registry.load(ctx, false)?;
         }
         let cached_tablet = tablet_registry.get_or_default(region_id);
 

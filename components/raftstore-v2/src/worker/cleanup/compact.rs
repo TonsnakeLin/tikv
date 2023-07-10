@@ -261,7 +261,7 @@ mod tests {
         let mut region = Region::default();
         region.set_id(2);
         let ctx = TabletContext::new(&region, Some(5), false);
-        let mut cache = registry.load(ctx, true, false).unwrap();
+        let mut cache = registry.load(ctx, true).unwrap();
         let tablet = cache.latest().unwrap();
 
         // mvcc_put 0..5
@@ -290,7 +290,7 @@ mod tests {
 
         region.set_id(3);
         let ctx = TabletContext::new(&region, Some(5), false);
-        let mut cache = registry.load(ctx, true, false).unwrap();
+        let mut cache = registry.load(ctx, true).unwrap();
         let tablet = cache.latest().unwrap();
         // mvcc_put 5..10
         for i in 5..10 {

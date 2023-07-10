@@ -1479,7 +1479,7 @@ impl<CER: ConfiguredRaftEngine, F: KvFormat> TikvServer<CER, F> {
         .unwrap();
         // It always use the singleton kv_engine, use arbitrary id and suffix.
         let ctx = TabletContext::with_infinite_region(0, Some(0), false);
-        reg.load(ctx, false, false).unwrap();
+        reg.load(ctx, false).unwrap();
         self.tablet_registry = Some(reg.clone());
         engines.raft.register_config(cfg_controller);
 
@@ -1555,7 +1555,7 @@ mod test {
 
         for i in 1..6 {
             let ctx = TabletContext::with_infinite_region(i, Some(10), false);
-            reg.load(ctx, true, false).unwrap();
+            reg.load(ctx, true).unwrap();
         }
 
         let mut cached = reg.get(1).unwrap();
@@ -1574,7 +1574,7 @@ mod test {
             .unwrap();
 
         let ctx = TabletContext::with_infinite_region(1, Some(20), false);
-        reg.load(ctx, true, false).unwrap();
+        reg.load(ctx, true).unwrap();
         tablet = cached.latest().unwrap();
 
         for i in 1..11 {
