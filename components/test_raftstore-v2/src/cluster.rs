@@ -1480,7 +1480,6 @@ impl<T: Simulator<EK>, EK: KvEngine> Cluster<T, EK> {
             region.get_region_epoch().clone(),
             vec![split_key],
             "test".into(),
-            0,
             Box::new(move |resp| {
                 cb.invoke_with_response(resp.clone());
             }),

@@ -4705,7 +4705,7 @@ mod tests {
     fn test_rocks_rate_limit_zero() {
         let mut tikv_cfg = TikvConfig::default();
         tikv_cfg.rocksdb.rate_bytes_per_sec = ReadableSize(0);
-        let resource = tikv_cfg.rocksdb.build_resources(Arc::new(Env::default()));
+        let resource = tikv_cfg.rocksdb.build_resources((Some(Arc::new(Env::default())), Some(Arc::new(Env::default()))));
         tikv_cfg
             .rocksdb
             .build_opt(&resource, tikv_cfg.storage.engine, false);

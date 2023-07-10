@@ -368,7 +368,7 @@ mod tests {
         let region_id = 5_u64;
         let tablet_suffix = 5_u64;
         let tablet_context = TabletContext::with_infinite_region(region_id, Some(tablet_suffix), false);
-        reg.load(tablet_context, false).unwrap();
+        reg.load(tablet_context, false, false).unwrap();
         tx.send(FlowInfo::Created(region_id)).unwrap();
         tx.send(FlowInfo::L0Intra("default".to_string(), 0, region_id))
             .unwrap();

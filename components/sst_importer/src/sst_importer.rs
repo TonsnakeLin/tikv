@@ -1449,7 +1449,7 @@ mod tests {
 
         let db_path = temp_dir.path().join("db");
         let env = get_env(key_manager.clone(), None /* io_rate_limiter */).unwrap();
-        let db = new_test_engine_with_env(db_path.to_str().unwrap(), &[CF_DEFAULT], env.0);
+        let db = new_test_engine_with_env(db_path.to_str().unwrap(), &[CF_DEFAULT], env.0.as_ref().unwrap().clone());
 
         let cases = vec![(0, 10), (5, 15), (10, 20), (0, 100)];
 
@@ -2268,7 +2268,7 @@ mod tests {
 
         let db_path = temp_dir.path().join("db");
         let env = get_env(Some(key_manager), None /* io_rate_limiter */).unwrap();
-        let db = new_test_engine_with_env(db_path.to_str().unwrap(), DATA_CFS, env.0.clone());
+        let db = new_test_engine_with_env(db_path.to_str().unwrap(), DATA_CFS, env.0.as_ref().unwrap().clone());
 
         let range = importer
             .download::<TestEngine>(
@@ -2293,7 +2293,7 @@ mod tests {
         assert_eq!(sst_file_metadata.len(), meta.get_length());
 
         // verifies the SST content is correct.
-        let sst_reader = new_sst_reader(sst_file_path.to_str().unwrap(), Some(env));
+        let sst_reader = new_sst_reader(sst_file_path.to_str().unwrap(), env.0);
         sst_reader.verify_checksum().unwrap();
         let mut iter = sst_reader.iter(IterOptions::default()).unwrap();
         iter.seek_to_first().unwrap();

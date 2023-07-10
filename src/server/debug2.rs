@@ -1200,7 +1200,7 @@ mod tests {
         state.set_region(region.clone());
         state.set_tablet_index(5);
 
-        let ctx = TabletContext::new(&region, Some(5), is_encrypted);
+        let ctx = TabletContext::new(&region, Some(5), false);
         let mut tablet_cache = debugger.tablet_reg.load(ctx, true, false).unwrap();
         let tablet = tablet_cache.latest().unwrap();
 
@@ -1579,8 +1579,8 @@ mod tests {
             let mut region = metapb::Region::default();
             region.set_peers(vec![new_peer(1, i + 1)].into());
             region.set_id(i + 1);
-            let ctx = TabletContext::new(&region, Some(5));
-            let mut cache = debugger.tablet_reg.load(ctx, true).unwrap();
+            let ctx = TabletContext::new(&region, Some(5), false);
+            let mut cache = debugger.tablet_reg.load(ctx, true, false).unwrap();
             let tablet = cache.latest().unwrap();
             for j in 0..10 {
                 // (6 + 3) * 10
@@ -1623,8 +1623,8 @@ mod tests {
             let mut region = metapb::Region::default();
             region.set_peers(vec![new_peer(1, i + 1)].into());
             region.set_id(i + 1);
-            let ctx = TabletContext::new(&region, Some(5));
-            let mut cache = debugger.tablet_reg.load(ctx, true).unwrap();
+            let ctx = TabletContext::new(&region, Some(5), false);
+            let mut cache = debugger.tablet_reg.load(ctx, true, false).unwrap();
             let tablet = cache.latest().unwrap();
             for j in 0..=i {
                 let k = format!("zk{:04}", i * 100 + j);
