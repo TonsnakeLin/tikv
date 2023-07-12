@@ -68,7 +68,10 @@ use crate::{
 pub const SPLIT_PREFIX: &str = "split";
 
 // bit 15~12, used by tidb-server request
+// The split request comes from creating table.
 pub const SPLIT_REQUEST_FROM_TIDB_CREATE_TABLE: u32 = 0x8000;
+// The split request comes from spliting table.
+pub const SPLIT_REQUEST_FROM_TIDB_SPLIT_TABLE: u32 = 0x4000;
 // bit 11~8, used by tikv-ctl
 // SPLIT_REQUEST_FROM_TIKVCTL is defined in tikv-ctl
 // pub const SPLIT_REQUEST_FROM_TIKVCTL: u32 = 0x0800;
@@ -470,7 +473,6 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
 
         let region = self.region();
         let region_id = region.get_id();
-        let region_was_encrypted = region.get_encrypted_region() & ENCRYPTED_REGION_BIT_MASK;
         validate_batch_split(req, self.region())?;
 
         let mut boundaries: Vec<&[u8]> = Vec::default();
@@ -481,7 +483,35 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
         boundaries.push(self.region().get_end_key());
 
         let split_reqs = req.get_splits();
+        // region_was_encrypted: the original encrypted flag of this region.
+        // new_table_region_encrypted: when creating a new table, the encrypted flag for the regions of this table.
+        // splited_region_encrypt_flag: it is a tmp flag used to set encryption flag when creating new regions.
+        // When create table: It creates a new region for the table of the current region belong to, and reuses the
+        // current region for the new table created.
+        // When create table with presplitting regions: It creates a new region for the table of the current region
+        // belong to, and creates new regions for the new table, resuses current region for the new table too.
+        // current region for the new table created.
+        // when split table: It only creates new regions for the corresponding table.
+        // when split index: It only creates new regions for the corresponding table.
+        // splited_region_encrypt_flag：
+        let region_was_encrypted = region.get_encrypted_region() & ENCRYPTED_REGION_BIT_MASK;
+        let new_table_region_encrypted;
+        let mut splited_region_encrypt_flag = region_was_encrypted;
+        let derived_encrypt_flag = region.get_encrypted_region();
         let req_encrypt_flag = split_reqs.get_encrypt_region();
+        // If the split request comes from creating table, it should use the new encryption atrribute,
+        // doesn't use the original region encryption atrribute.
+        if req_encrypt_flag & SPLIT_REQUEST_FROM_TIDB_CREATE_TABLE == 0x8000 as u32 {
+            if req_encrypt_flag & SPLIT_DERIVED_REGION_ENCRYPTED == 0x0001 as u32  {
+                // region_was_encrypted = 1;
+                new_table_region_encrypted = 1;
+            } else {
+                // region_was_encrypted = 0;
+                new_table_region_encrypted = 0;
+            }  
+            splited_region_encrypt_flag = new_table_region_encrypted;        
+        }
+
         let new_region_cnt = split_reqs.get_requests().len();
         let new_version = region.get_region_epoch().get_version() + new_region_cnt as u64;
         info!(
@@ -490,8 +520,10 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
             "region" => ?region,
             "index" => log_index,
             "boundaries" => %KeysInfoFormatter(boundaries.iter()),
-            "region_was_encrypted" => region_was_encrypted,
+            "original_region_is_encrypted" => region_was_encrypted,
             "req_encrypt_flag" => req_encrypt_flag,
+            "original_derived_encrypt_flag" => derived_encrypt_flag,
+            "splited_region_encrypt_flag" => splited_region_encrypt_flag,
         );
 
         let mut derived_req = SplitRequest::default();
@@ -513,7 +545,7 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
                 new_region.set_id(req.get_new_region_id());
                 new_region.set_region_epoch(region.get_region_epoch().to_owned());
                 new_region.mut_region_epoch().set_version(new_version);
-                new_region.set_encrypted_region(region_was_encrypted);
+                new_region.set_encrypted_region(splited_region_encrypt_flag);
                 new_region.set_start_key(start_key.to_vec());
                 new_region.set_end_key(end_key.to_vec());
                 new_region.set_peers(region.get_peers().to_vec().into());
@@ -534,12 +566,16 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
         // If the split-region request comes from tidb-server creating table, 
         // the encryption flag in `region` is dependended by the request encryption flag.
         let derived_index = if right_derive { regions.len() - 1 } else { 0 };
+        let old_table_index = if right_derive { 0 } else { 1 };
         if req_encrypt_flag & SPLIT_REQUEST_FROM_TIDB_CREATE_TABLE == 0x8000 as u32 {
             if req_encrypt_flag & SPLIT_DERIVED_REGION_ENCRYPTED == 0x0001 as u32  {
                 regions[derived_index].set_encrypted_region(ENCRYPTED_SPLITED_STABLE_REGION_BIT_MASK);
             } else {
                 regions[derived_index].set_encrypted_region(0 as u32);
-            }            
+            }
+            regions[old_table_index].set_encrypted_region(region_was_encrypted);            
+        } else {
+            regions[derived_index].set_encrypted_region(derived_encrypt_flag);
         }
         let encrypt_derived_region = is_encrypted_region(regions[derived_index].get_encrypted_region());
 
@@ -569,7 +605,8 @@ impl<EK: KvEngine, R: ApplyResReporter> Apply<EK, R> {
             "region" =>  ?self.region(),
             "checkpoint_duration" => ?checkpoint_duration,
             "total_duration" => ?elapsed,
-            "derived_region_is_encrypted" => ?encrypt_derived_region,
+            "new_derived_region_encrypted" => ?encrypt_derived_region,
+            "new_derived_encrypt_flag" => regions[derived_index].get_encrypted_region(),
         );
 
         let reg = self.tablet_registry();
