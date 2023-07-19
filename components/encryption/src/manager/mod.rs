@@ -929,6 +929,15 @@ impl EncryptionKeyManager for DataKeyManager {
         }
         Ok(())
     }
+
+    fn is_encrypted(&self) -> bool {
+        let x = match self.method {
+            EncryptionMethod::Unknown => false,
+            EncryptionMethod::Plaintext => false,
+            _ => true,
+        };
+        x
+    }
 }
 
 /// An RAII-style importer of data keys. It automatically creates data key that

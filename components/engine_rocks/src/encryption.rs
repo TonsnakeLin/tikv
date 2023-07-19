@@ -54,6 +54,9 @@ impl<T: EncryptionKeyManager> DBEncryptionKeyManager for WrappedEncryptionKeyMan
     fn link_file(&self, src_fname: &str, dst_fname: &str) -> Result<()> {
         self.manager.link_file(src_fname, dst_fname)
     }
+    fn is_encrypted(&self) -> bool {
+        self.manager.is_encrypted()
+    }
 }
 
 fn convert_file_encryption_info(input: FileEncryptionInfo) -> DBFileEncryptionInfo {
