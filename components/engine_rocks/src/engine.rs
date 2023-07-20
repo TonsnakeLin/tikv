@@ -200,8 +200,8 @@ impl KvEngine for RocksEngine {
         Arc::strong_count(&self.db)
     }
 
-    fn has_key_manager_env(&self) -> bool {
-        false
+    fn has_encrypted_env(&self) -> bool {
+        self.db.has_encrypted_env()
     }
 }
 

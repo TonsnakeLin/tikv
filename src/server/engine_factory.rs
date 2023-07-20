@@ -12,7 +12,7 @@ use engine_rocks::{
 };
 use engine_traits::{
     CompactionJobInfo, MiscExt, PersistenceListener, Result, StateStorage, TabletContext,
-    TabletFactory, CF_DEFAULT, CF_WRITE,
+    TabletFactory, CF_DEFAULT, CF_WRITE, KvEngine,
 };
 use kvproto::kvrpcpb::ApiVersion;
 use raftstore::RegionInfoAccessor;
@@ -256,13 +256,18 @@ impl TabletFactory<RocksEngine> for KvEngineFactory {
         } else if let Some(listener) = &self.inner.flow_listener {
             listener.clone_with(ctx.id).on_created();
         }
+        info!("open tablet sucessfully"; "encrypted" => kv_engine.as_ref().unwrap().has_encrypted_env());
         kv_engine        
     } 
 
-    // todo: add the param `use_encryp_env` 
     fn destroy_tablet(&self, ctx: TabletContext, path: &Path) -> Result<()> {
-        info!("destroy tablet"; "path" => %path.display(), "region_id" => ctx.id, "suffix" => ?ctx.suffix);
+        info!("destroy tablet"; "path" => %path.display(), 
+            "region_id" => ctx.id, 
+            "suffix" => ?ctx.suffix,
+            "is_encrypted" => ctx.is_encrypted);
         // Create kv engine.
+        // currently, it doens't create kv engine.
+        // It destroys the tablet by removing dir.
         let _db_opts = self.db_opts(EngineType::RaftKv2, ctx.is_encrypted);
         let _cf_opts = self.cf_opts(None, EngineType::RaftKv2);
         // TODOTODO: call rust-rocks or tirocks to destroy_engine;

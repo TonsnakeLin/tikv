@@ -303,13 +303,14 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
         old_tablet: EK,
         new_tablet_index: u64,
     ) {
+        let is_encrypted = old_tablet.has_encrypted_env();
         info!(
             self.logger,
             "record tombstone tablet";
             "prev_tablet_path" => old_tablet.path(),
-            "new_tablet_index" => new_tablet_index
+            "new_tablet_index" => new_tablet_index,
+            "is_encrypted" => is_encrypted,
         );
-        let is_encrypted = old_tablet.has_key_manager_env();
         let compact_log_context = self.compact_log_context_mut();
         compact_log_context
             .tombstone_tablets_wait_index
@@ -335,9 +336,10 @@ impl<EK: KvEngine, ER: RaftEngine> Peer<EK, ER> {
     ) {
         info!(
             self.logger,
-            "record tombstone tablet";
+            "record tombstone tablet path";
             "prev_tablet_path" => old_tablet.display(),
-            "new_tablet_index" => new_tablet_index
+            "new_tablet_index" => new_tablet_index,
+            "is_encrypted" => is_encrypted,
         );
         let compact_log_context = self.compact_log_context_mut();
         compact_log_context

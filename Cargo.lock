@@ -3089,7 +3089,7 @@ dependencies = [
 [[package]]
 name = "librocksdb_sys"
 version = "0.1.0"
-source = "git+https://github.com/TonsnakeLin/rust-rocksdb.git?branch=table-encryption-dev#9bb783447f23a7f12473ec748c90a56479c5ae40"
+source = "git+https://github.com/TonsnakeLin/rust-rocksdb.git?branch=table-encryption-dev#99a6c7deb6037c2a7866b00b6ffc3b3e24bb7eee"
 dependencies = [
  "bindgen 0.65.1",
  "bzip2-sys",
@@ -3108,7 +3108,7 @@ dependencies = [
 [[package]]
 name = "libtitan_sys"
 version = "0.0.1"
-source = "git+https://github.com/TonsnakeLin/rust-rocksdb.git?branch=table-encryption-dev#9bb783447f23a7f12473ec748c90a56479c5ae40"
+source = "git+https://github.com/TonsnakeLin/rust-rocksdb.git?branch=table-encryption-dev#99a6c7deb6037c2a7866b00b6ffc3b3e24bb7eee"
 dependencies = [
  "bzip2-sys",
  "cc",
@@ -5078,7 +5078,7 @@ dependencies = [
 [[package]]
 name = "rocksdb"
 version = "0.3.0"
-source = "git+https://github.com/TonsnakeLin/rust-rocksdb.git?branch=table-encryption-dev#9bb783447f23a7f12473ec748c90a56479c5ae40"
+source = "git+https://github.com/TonsnakeLin/rust-rocksdb.git?branch=table-encryption-dev#99a6c7deb6037c2a7866b00b6ffc3b3e24bb7eee"
 dependencies = [
  "libc 0.2.139",
  "librocksdb_sys",
