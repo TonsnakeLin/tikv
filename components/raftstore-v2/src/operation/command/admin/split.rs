@@ -141,9 +141,11 @@ pub fn is_encrypted_region(flag: u32) -> bool {
     if flag & ENCRYPTED_REGION_BIT_MASK == 0 {
         return false;
     }
+    /*
     if flag & SPLITED_STABLE_REGION_BIT_MASK > 0 {
         return false;
     }
+    */
     return true;
 }
 

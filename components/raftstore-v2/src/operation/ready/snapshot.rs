@@ -158,7 +158,7 @@ pub fn install_tablet<EK: KvEngine>(
         source.display(),
         target_path.display()
     );
-    if is_encrypted_region && let Some(m) = &key_manager {
+    if let Some(m) = &key_manager {
         m.link_file(source.to_str().unwrap(), target_path.to_str().unwrap())
             .unwrap();
     }
@@ -173,7 +173,7 @@ pub fn install_tablet<EK: KvEngine>(
             e
         );
     }
-    if is_encrypted_region && let Some(m) = &key_manager {
+    if let Some(m) = &key_manager {
         m.delete_file(source.to_str().unwrap()).unwrap();
     }
     true

@@ -838,6 +838,10 @@ impl DataKeyManager {
     pub fn encryption_method(&self) -> engine_traits::EncryptionMethod {
         crypter::to_engine_encryption_method(self.method)
     }
+
+    pub fn set_plaintext_encryption_method(&mut self) {
+        self.method = EncryptionMethod::Plaintext;
+    }
 }
 
 impl Drop for DataKeyManager {
@@ -847,6 +851,17 @@ impl Drop for DataKeyManager {
         }
         if let Some(Err(e)) = self.background_worker.take().map(|w| w.join()) {
             info!("failed to join background rotation, are we shutting down?"; "err" => ?e);
+        }
+    }
+}
+
+impl Clone for DataKeyManager {
+    fn clone(&self) -> Self {
+        DataKeyManager {
+            dicts: self.dicts.clone(),
+            method: self.method.clone(),
+            rotate_tx: self.rotate_tx.clone(),
+            background_worker: None,
         }
     }
 }

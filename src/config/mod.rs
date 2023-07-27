@@ -1450,7 +1450,7 @@ impl DbConfig {
         if for_engine == EngineType::RaftKv2 {
             if use_encryp_env {
                 opts.set_env(shared.env.0.as_ref().unwrap().clone());
-                info!("build option using encryption env");
+                info!("build option using default env");
                 // todo: check env.0 is encrption env
             } else {
                 // maybe we should use plaitext env, but we can't judge it correctly.

@@ -124,10 +124,18 @@ pub fn get_env(
     key_manager: Option<std::sync::Arc<::encryption::DataKeyManager>>,
     limiter: Option<std::sync::Arc<::file_system::IoRateLimiter>>,
 ) -> engine_traits::Result<(Option<std::sync::Arc<raw::Env>>, Option<std::sync::Arc<raw::Env>>)> {
+    let km = key_manager.clone();
     let env1 = encryption::get_env(None /* base_env */, key_manager)?;
     let env = file_system::get_env(Some(env1), limiter.clone())?;
 
-    let env2 = encryption::get_env(None , None)?;
+    let env2 = if km.is_some() {
+        let mut km = km.unwrap();
+        let dm = std::sync::Arc::<::encryption::DataKeyManager>::make_mut(&mut km);
+        dm.set_plaintext_encryption_method();
+        encryption::get_env(None , Some(std::sync::Arc::new(dm.clone())))?
+    } else {
+        encryption::get_env(None , None)?
+    };
     let env_no_encryp = file_system::get_env(Some(env2), limiter)?;
     
     return Ok((Some(env), Some(env_no_encryp)))
