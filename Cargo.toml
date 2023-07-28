@@ -173,8 +173,8 @@ zipf = "6.1.0"
 
 [patch.crates-io]
 # TODO: remove this when new raft-rs is published.
-raft = { git = "https://github.com/tikv/raft-rs", branch = "master" }
-raft-proto = { git = "https://github.com/tikv/raft-rs", branch = "master" }
+raft = { git = "https://github.com/TonsnakeLin/raft-rs.git", branch = "raft-learn" }
+raft-proto = { git = "https://github.com/TonsnakeLin/raft-rs.git", branch = "raft-learn" }
 protobuf = { git = "https://github.com/pingcap/rust-protobuf", branch = "v2.8" }
 protobuf-codegen = { git = "https://github.com/pingcap/rust-protobuf", branch = "v2.8" }
 
@@ -201,8 +201,8 @@ procinfo = { git = "https://github.com/tikv/procinfo-rs", rev = "6599eb9dca74229
 # When you modify TiKV cooperatively with kvproto, this will be useful to submit the PR to TiKV and the PR to
 # kvproto at the same time.
 # After the PR to kvproto is merged, remember to comment this out and run `cargo update -p kvproto`.
-# [patch.'https://github.com/pingcap/kvproto']
-# kvproto = { git = "https://github.com/your_github_id/kvproto", branch = "your_branch" }
+[patch.'https://github.com/pingcap/kvproto']
+kvproto = { git = "https://github.com/TonsnakeLin/kvproto", branch = "raft-learn" }
 #
 # After the PR to rust-rocksdb is merged, remember to comment this out and run `cargo update -p rocksdb`.
 # [patch.'https://github.com/tikv/rust-rocksdb']
