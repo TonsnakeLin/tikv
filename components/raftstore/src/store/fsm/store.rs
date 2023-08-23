@@ -970,9 +970,9 @@ impl<EK: KvEngine, ER: RaftEngine, T: Transport> PollHandler<PeerFsm<EK, ER>, St
     }
 
     fn handle_control(&mut self, store: &mut StoreFsm<EK>) -> Option<usize> {
-        info!("Poller::poll, begin to process control fsm"; 
+        /* info!("Poller::poll, begin to process control fsm"; 
         "store" => ?store.store,
-        "thread" => ?std::thread::current().name());
+        "thread" => ?std::thread::current().name()); */
         let mut expected_msg_count = None;
         while self.store_msg_buf.len() < self.messages_per_tick {
             match store.receiver.try_recv() {
@@ -1195,6 +1195,10 @@ impl<EK: KvEngine, ER: RaftEngine, T: Transport> PollHandler<PeerFsm<EK, ER>, St
                 self.flush_events();
             }
         }
+    }
+
+    fn get_print_info(&self) -> bool {
+        self.poll_ctx.print_info
     }
 }
 

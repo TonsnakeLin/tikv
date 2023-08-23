@@ -4212,10 +4212,14 @@ where
 
         fail_point!("raft_propose", |_| Ok(Either::Right(0)));
         let propose_index = self.next_proposal_index();
+        if poll_ctx.print_info {
+            self.raft_group.set_print_info(true);
+        }
         self.raft_group.propose(ctx.to_vec(), data)?;
         if self.next_proposal_index() == propose_index {
             // The message is dropped silently, this usually due to leader absence
             // or transferring leader. Both cases can be considered as NotLeader error.
+            self.raft_group.set_print_info(false);
             return Err(Error::NotLeader(self.region_id, None));
         }
 
@@ -4246,7 +4250,7 @@ where
                 _ => {}
             }
         }
-
+        self.raft_group.set_print_info(false);
         Ok(Either::Left(propose_index))
     }
 

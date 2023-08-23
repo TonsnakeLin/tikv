@@ -286,6 +286,11 @@ pub trait PollHandler<N, C>: Send + 'static {
     fn get_priority(&self) -> Priority {
         Priority::Normal
     }
+
+    /// This function returns handler.print_info
+    fn get_print_info(&self) -> bool {
+        false
+    }
 }
 
 /// Internal poller that fetches batch and call handler hooks for readiness.
@@ -366,8 +371,8 @@ impl<N: Fsm, C: Fsm, Handler: PollHandler<N, C>> Poller<N, C, Handler> {
             max_batch_size = std::cmp::max(self.max_batch_size, batch.normals.len());
 
             if batch.control.is_some() {
-                info!("Poller::poll, begin to process control fsm"; 
-                "thread" => ?std::thread::current().name());
+                /* info!("Poller::poll, begin to process control fsm"; 
+                "thread" => ?std::thread::current().name()); */
                 let len = self.handler.handle_control(batch.control.as_mut().unwrap());
                 if batch.control.as_ref().unwrap().is_stopped() {
                     batch.remove_control(&self.router.control_box);
@@ -399,11 +404,13 @@ impl<N: Fsm, C: Fsm, Handler: PollHandler<N, C>> Poller<N, C, Handler> {
                         }
                     }
                     if let HandleResult::StopAt { progress, skip_end } = res {
-                        info!("Poller::poll, result is HandleResult::StopAt"; 
-                        "progress" => progress,
-                        "skip_end" => skip_end,
-                        "thread" => ?std::thread::current().name());
-                        p.policy = Some(ReschedulePolicy::Release(progress));
+                        if self.handler.get_print_info() {
+                            info!("Poller::poll, result is HandleResult::StopAt"; 
+                            "progress" => progress,
+                            "skip_end" => skip_end,
+                            "thread" => ?std::thread::current().name());
+                            p.policy = Some(ReschedulePolicy::Release(progress));
+                        }
                         reschedule_fsms.push(i);
                         if skip_end {
                             to_skip_end.push(i);
@@ -430,10 +437,12 @@ impl<N: Fsm, C: Fsm, Handler: PollHandler<N, C>> Poller<N, C, Handler> {
                     p.policy = Some(ReschedulePolicy::Remove);
                     reschedule_fsms.push(fsm_cnt);
                 } else if let HandleResult::StopAt { progress, skip_end } = res {
-                    info!("Poller::poll, result is HandleResult::StopAt"; 
-                    "progress" => progress,
-                    "skip_end" => skip_end,
-                    "thread" => ?std::thread::current().name());                    
+                    if self.handler.get_print_info() {
+                        info!("Poller::poll, result is HandleResult::StopAt"; 
+                        "progress" => progress,
+                        "skip_end" => skip_end,
+                        "thread" => ?std::thread::current().name());    
+                    }
                     p.policy = Some(ReschedulePolicy::Release(progress));
                     reschedule_fsms.push(fsm_cnt);
                     if skip_end {
