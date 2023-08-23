@@ -575,6 +575,19 @@ pub struct WriteContext<'a, L: LockManager> {
     pub raw_ext: Option<RawExt>, // use for apiv2
 }
 
+impl Debug for WriteContext<'_, crate::server::lock_manager::LockManager> {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            fmt,
+            "lock_mgr:{:?}, concurrency_manager:{}, extra_op:{:?}, async_apply_prewrite:{}",
+            "lock_mgr is not printed",
+            self.concurrency_manager.max_ts(),
+            "extra_op is not printed",
+            self.async_apply_prewrite,
+        )
+    }
+}
+
 pub struct ReaderWithStats<'a, S: Snapshot> {
     reader: SnapshotReader<S>,
     statistics: &'a mut Statistics,

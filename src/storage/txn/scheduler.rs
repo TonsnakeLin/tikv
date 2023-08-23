@@ -52,7 +52,7 @@ use resource_metering::{FutureExt, ResourceTagFactory};
 use smallvec::{smallvec, SmallVec};
 use tikv_kv::{Modify, Snapshot, SnapshotExt, WriteData, WriteEvent};
 use tikv_util::{quota_limiter::QuotaLimiter, time::Instant, timer::GLOBAL_TIMER_HANDLE};
-use tracker::{get_tls_tracker_token, set_tls_tracker_token, TrackerToken, GLOBAL_TRACKERS};
+use tracker::{get_tls_tracker_token, set_tls_tracker_token, TrackerToken, GLOBAL_TRACKERS, INVALID_TRACKER_TOKEN};
 use txn_types::TimeStamp;
 
 use crate::{
@@ -209,6 +209,17 @@ impl TaskContext {
         self.owned
             .compare_exchange(false, true, Ordering::SeqCst, Ordering::Relaxed)
             .is_ok()
+    }
+
+    fn get_tracker_token(&self) -> TrackerToken{
+        if self.task.is_some() {
+            self.task.as_ref().unwrap().tracker
+        } else {            
+            info!("TaskContext::get_tracker_token returns INVALID_TRACKER_TOKEN"; 
+            "thread" => ?std::thread::current().name());  
+            INVALID_TRACKER_TOKEN
+        }
+        
     }
 }
 
@@ -836,7 +847,19 @@ impl<E: Engine, L: LockManager> TxnScheduler<E, L> {
         debug!("write command finished";
             "cid" => cid, "pipelined" => pipelined, "async_apply_prewrite" => async_apply_prewrite);
         drop(lock_guards);
-        let tctx = self.inner.dequeue_task_context(cid);
+        let tctx :TaskContext = self.inner.dequeue_task_context(cid);
+        let tracker_token = sched_details.tracker;
+        let print_info = GLOBAL_TRACKERS.with_tracker(tracker_token, |tracker| {
+            tracker.req_info.print_info
+        }).unwrap_or(false);
+
+        if print_info {
+            info!("on_write_finished"; 
+            "pipelined" => pipelined,
+            "async_apply_prewrite" => async_apply_prewrite,
+            "thread" => ?std::thread::current().name());   
+        }
+
 
         let mut do_wake_up = !tctx.woken_up_resumable_lock_requests.is_empty();
         // If pipelined pessimistic lock or async apply prewrite takes effect, it's not
@@ -863,7 +886,15 @@ impl<E: Engine, L: LockManager> TxnScheduler<E, L> {
             if let ProcessResult::NextCommand { cmd } = pr {
                 SCHED_STAGE_COUNTER_VEC.get(tag).next_cmd.inc();
                 self.schedule_command(None, cmd, cb, None);
+                if print_info {
+                    info!("on_write_finished, ProcessResult::NextCommand "; 
+                    "thread" => ?std::thread::current().name());   
+                }
             } else {
+                if print_info {
+                    info!("on_write_finished, will execute cb"; 
+                    "thread" => ?std::thread::current().name());   
+                }
                 GLOBAL_TRACKERS.with_tracker(sched_details.tracker, |tracker| {
                     tracker.metrics.scheduler_process_nanos = sched_details
                         .start_process_instant
@@ -1205,6 +1236,11 @@ impl<E: Engine, L: LockManager> TxnScheduler<E, L> {
         sched_details: &mut SchedulerDetails,
     ) {
         fail_point!("txn_before_process_write");
+        let print_info = if task.cmd.ctx().get_request_source().contains("external_") {
+            true
+        } else {
+            false
+        };
         let write_bytes = task.cmd.write_bytes();
         let tag = task.cmd.tag();
         let cid = task.cid;
@@ -1232,7 +1268,13 @@ impl<E: Engine, L: LockManager> TxnScheduler<E, L> {
         let max_ts_synced = snapshot.ext().is_max_ts_synced();
         let causal_ts_provider = self.inner.causal_ts_provider.clone();
         let concurrency_manager = self.inner.concurrency_manager.clone();
-
+        if print_info {
+            info!("process_write"; 
+            "cmd" => ?task.cmd,
+            "pipelined" => pipelined,
+            "pessimistic_lock_mode" => ?pessimistic_lock_mode,
+            "thread" => ?std::thread::current().name());
+        }
         let raw_ext = get_raw_ext(
             causal_ts_provider,
             concurrency_manager.clone(),
@@ -1563,6 +1605,15 @@ impl<E: Engine, L: LockManager> TxnScheduler<E, L> {
             }
         });
 
+        if print_info {
+            info!("process_write"; "thread" => ?std::thread::current().name(), 
+            "cid" => task.cid,
+            "version" => version,
+            "term" => term,
+            "response_policy" => ?response_policy,
+            "is_async_apply_prewrite" => is_async_apply_prewrite);
+        }
+
         let async_write_start = Instant::now_coarse();
         let mut res = unsafe {
             with_tls_engine(|e: &mut E| {
@@ -1590,6 +1641,11 @@ impl<E: Engine, L: LockManager> TxnScheduler<E, L> {
                             CommandStageKind::async_apply_prewrite,
                         );
                     }
+                    if print_info {
+                        info!("process_write, WriteEvent::Committed"; 
+                        "early_return" => early_return,
+                        "thread" => ?std::thread::current().name());                        
+                    }
                 }
                 WriteEvent::Proposed => {
                     let early_return = (|| {
@@ -1615,6 +1671,11 @@ impl<E: Engine, L: LockManager> TxnScheduler<E, L> {
                             tag,
                             CommandStageKind::pipelined_write,
                         );
+                    }
+                    if print_info {
+                        info!("process_write, WriteEvent::Proposed";  
+                        "early_return" => early_return,
+                        "thread" => ?std::thread::current().name(),);                        
                     }
                 }
                 WriteEvent::Finished(res) => {
@@ -1647,6 +1708,11 @@ impl<E: Engine, L: LockManager> TxnScheduler<E, L> {
                     }
                     sched_details.async_write_nanos =
                         async_write_start.saturating_elapsed().as_nanos() as u64;
+
+                    if print_info {
+                        info!("process_write, WriteEvent::Finished"; 
+                        "thread" => ?std::thread::current().name());                      
+                    }    
                     return;
                 }
             }

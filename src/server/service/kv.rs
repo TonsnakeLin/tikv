@@ -1234,11 +1234,12 @@ fn handle_batch_commands_request<E: Engine, L: LockManager, F: KvFormat>(
                         .with_label_values(&[resource_control_ctx.get_resource_group_name()])
                         .inc();
                     let begin_instant = Instant::now();
-                    let source = req.mut_context().take_request_source();
+                    // let source = req.mut_context().take_request_source();
+                    let source = String::from(req.mut_context().get_request_source());
                     let resp = $future_fn($($arg,)* req)
                         .map_ok(oneof!(batch_commands_response::response::Cmd::$cmd))
                         .map_err(|_| GRPC_MSG_FAIL_COUNTER.$metric_name.inc());
-                    response_batch_commands_request(id, resp, tx.clone(), begin_instant, GrpcTypeKind::$metric_name, source);
+                    response_batch_commands_request(id, resp, tx.clone(), begin_instant, GrpcTypeKind::$metric_name, String::from(source));
                 })*
                 Some(batch_commands_request::request::Cmd::Import(_)) => unimplemented!(),
             }

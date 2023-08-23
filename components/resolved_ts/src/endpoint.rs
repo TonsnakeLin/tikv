@@ -892,6 +892,7 @@ where
                     .map(TimeStamp::into_inner);
                 lock_num = Some(ob.resolver.locks_by_key.len());
             }
+            /*
             info!(
                 "the max gap of safe-ts is large";
                 "gap" => safe_ts_gap,
@@ -901,6 +902,7 @@ where
                 "lock num" => lock_num,
                 "min start ts" => min_start_ts,
             );
+            */
         }
         RTS_MIN_SAFE_TS_GAP.set(safe_ts_gap as i64);
 

@@ -15,6 +15,9 @@ pub struct RaftRouterCompactedEventSender<ER: RaftEngine> {
 impl<ER: RaftEngine> CompactedEventSender for RaftRouterCompactedEventSender<ER> {
     fn send(&self, event: RocksCompactedEvent) {
         let router = self.router.lock().unwrap();
+        tikv_util::info!("RaftRouterCompactedEventSender::send"; 
+        "event" => ?event,
+        "thread" => ?std::thread::current().name());
         let event = StoreMsg::CompactedEvent(event);
         if let Err(e) = router.send_control(event) {
             error_unknown!(?e; "send compaction finished event to raftstore failed");

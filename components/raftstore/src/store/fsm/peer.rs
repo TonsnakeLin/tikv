@@ -611,6 +611,7 @@ where
     pub fn handle_msgs(&mut self, msgs: &mut Vec<PeerMsg<EK>>) {
         let timer = TiInstant::now_coarse();
         let count = msgs.len();
+        let print_info = false;
         for m in msgs.drain(..) {
             match m {
                 PeerMsg::RaftMessage(msg) => {
@@ -626,6 +627,8 @@ where
                     }
                 }
                 PeerMsg::RaftCommand(cmd) => {
+                    let print_info = cmd.request.get_header().get_print_info();
+                    self.ctx.set_print_info(print_info);
                     let propose_time = cmd.send_time.saturating_elapsed();
                     self.ctx
                         .raft_metrics
@@ -5384,11 +5387,23 @@ where
         let mut resp = RaftCmdResponse::default();
         let term = self.fsm.peer.term();
         bind_term(&mut resp, term);
+        if self.ctx.print_info {
+            info!("propose_raft_command_internal, begin to propose"; 
+            "thread" => ?std::thread::current().name());
+        }
         if self.fsm.peer.propose(self.ctx, cb, msg, resp, diskfullopt) {
+            if self.ctx.print_info {
+                info!("propose_raft_command_internal, after propose, has_ready = true"; 
+                "thread" => ?std::thread::current().name());
+            }
             self.fsm.has_ready = true;
         }
 
         if self.fsm.peer.should_wake_up {
+            if self.ctx.print_info {
+                info!("propose_raft_command_internal, should_wake_up = true, call reset_raft_tick"; 
+                "thread" => ?std::thread::current().name());
+            }
             self.reset_raft_tick(GroupState::Ordered);
         }
 

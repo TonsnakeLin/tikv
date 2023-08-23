@@ -421,6 +421,10 @@ where
         &self,
         cmd: RaftCommand<EK::Snapshot>,
     ) -> std::result::Result<(), TrySendError<RaftCommand<EK::Snapshot>>> {
+        if cmd.request.get_header().get_print_info() {
+            info!("RaftRouter::send_raft_command"; 
+            "thread" => ?std::thread::current().name());
+        }
         let region_id = cmd.request.get_header().get_region_id();
         match self.send(region_id, PeerMsg::RaftCommand(cmd)) {
             Ok(()) => Ok(()),
@@ -571,6 +575,7 @@ where
     pub write_senders: WriteSenders<EK, ER>,
     pub sync_write_worker: Option<WriteWorker<EK, ER, RaftRouter<EK, ER>, T>>,
     pub pending_latency_inspect: Vec<util::LatencyInspector>,
+    pub print_info: bool,
 }
 
 impl<EK, ER, T> PollContext<EK, ER, T>
@@ -629,6 +634,10 @@ where
             self.unsafe_vote_deadline.take();
             None
         }
+    }
+
+    pub fn set_print_info(&mut self, p: bool) {
+        self.print_info = p;
     }
 }
 
@@ -693,6 +702,7 @@ where
     }
 }
 
+#[derive(Debug)]
 struct Store {
     // store id, before start the id is 0.
     id: u64,
@@ -706,6 +716,12 @@ struct Store {
 struct StoreReachability {
     last_broadcast: Instant,
     received_message_count: u64,
+}
+
+impl std::fmt::Debug for StoreReachability {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "StoreReachability [{:?} {}]", self.last_broadcast, self.received_message_count)
+    }
 }
 
 pub struct StoreFsm<EK>
@@ -785,9 +801,17 @@ impl<'a, EK: KvEngine + 'static, ER: RaftEngine + 'static, T: Transport>
         let timer = TiInstant::now_coarse();
         for m in msgs.drain(..) {
             match m {
-                StoreMsg::Tick(tick) => self.on_tick(tick),
+                StoreMsg::Tick(tick) => {
+                    info!("StoreFsmDelegate::handle_msgs, StoreMsg::Tick"; 
+                    "tick" => ?tick,
+                    "thread" => ?std::thread::current().name());
+                    self.on_tick(tick);
+                }
                 StoreMsg::RaftMessage(msg) => {
                     if !self.ctx.coprocessor_host.on_raft_message(&msg.msg) {
+                        info!("StoreFsmDelegate::handle_msgs, StoreMsg::RaftMessage is not need to step"; 
+                        "msg" => ?msg.msg,
+                        "thread" => ?std::thread::current().name());
                         continue;
                     }
                     if let Err(e) = self.on_raft_message(msg) {
@@ -946,6 +970,9 @@ impl<EK: KvEngine, ER: RaftEngine, T: Transport> PollHandler<PeerFsm<EK, ER>, St
     }
 
     fn handle_control(&mut self, store: &mut StoreFsm<EK>) -> Option<usize> {
+        info!("Poller::poll, begin to process control fsm"; 
+        "store" => ?store.store,
+        "thread" => ?std::thread::current().name());
         let mut expected_msg_count = None;
         while self.store_msg_buf.len() < self.messages_per_tick {
             match store.receiver.try_recv() {
@@ -961,6 +988,7 @@ impl<EK: KvEngine, ER: RaftEngine, T: Transport> PollHandler<PeerFsm<EK, ER>, St
                 }
             }
         }
+        self.poll_ctx.set_print_info(false);
         let mut delegate = StoreFsmDelegate {
             fsm: store,
             ctx: &mut self.poll_ctx,
@@ -1015,7 +1043,7 @@ impl<EK: KvEngine, ER: RaftEngine, T: Transport> PollHandler<PeerFsm<EK, ER>, St
                 }
             }
         }
-
+        self.poll_ctx.set_print_info(false);
         let mut delegate = PeerFsmDelegate::new(peer, &mut self.poll_ctx);
         delegate.handle_msgs(&mut self.peer_msg_buf);
         // No readiness is generated and using sync write, skipping calling ready and
@@ -1452,6 +1480,7 @@ where
             write_senders: self.write_senders.clone(),
             sync_write_worker,
             pending_latency_inspect: vec![],
+            print_info: false,
         };
         ctx.update_ticks_timeout();
         let tag = format!("[store {}]", ctx.store.get_id());

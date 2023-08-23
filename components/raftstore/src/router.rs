@@ -9,7 +9,7 @@ use error_code::ErrorCodeExt;
 use kvproto::{metapb, raft_cmdpb::RaftCmdRequest, raft_serverpb::RaftMessage};
 use raft::SnapshotStatus;
 use slog_global::warn;
-use tikv_util::time::ThreadReadId;
+use tikv_util::{info, time::ThreadReadId};
 
 use crate::{
     store::{
@@ -54,6 +54,11 @@ where
         cb: Callback<EK::Snapshot>,
         extra_opts: RaftCmdExtraOpts,
     ) -> RaftStoreResult<()> {
+        if req.get_header().get_print_info() {
+            info!("RaftStoreRouter::send_command"; 
+            "thread" => ?std::thread::current().name());
+        }
+        
         send_command_impl::<EK, _>(self, req, cb, extra_opts)
     }
 
@@ -104,6 +109,10 @@ where
     EK: KvEngine,
     PR: ProposalRouter<EK::Snapshot>,
 {
+    if req.get_header().get_print_info() {
+        info!("send_command_impl";
+        "thread" => ?std::thread::current().name());
+    }
     let region_id = req.get_header().get_region_id();
     let mut cmd = RaftCommand::new(req, cb);
     cmd.extra_opts = extra_opts;
@@ -215,6 +224,10 @@ impl<EK: KvEngine, ER: RaftEngine> ProposalRouter<EK::Snapshot> for ServerRaftSt
         &self,
         cmd: RaftCommand<EK::Snapshot>,
     ) -> std::result::Result<(), TrySendError<RaftCommand<EK::Snapshot>>> {
+        if cmd.request.get_header().get_print_info() {
+            info!("impl ProposalRouter for ServerRaftStoreRouter, sned(self, RaftCommand)"; 
+            "thread" => ?std::thread::current().name());
+        }
         ProposalRouter::send(&self.router, cmd)
     }
 }

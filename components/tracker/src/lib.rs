@@ -88,6 +88,8 @@ pub struct RequestInfo {
     pub task_id: u64,
     pub resource_group_tag: Vec<u8>,
     pub request_type: RequestType,
+    pub print_info: bool,
+    pub request_source: String,
 }
 
 impl RequestInfo {
@@ -98,6 +100,8 @@ impl RequestInfo {
             task_id: ctx.get_task_id(),
             resource_group_tag: ctx.get_resource_group_tag().to_vec(),
             request_type,
+            print_info: ctx.get_request_source().contains("external_"),
+            request_source: String::from(ctx.get_request_source()),
         }
     }
 }

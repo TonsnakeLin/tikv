@@ -3489,6 +3489,10 @@ where
                     // including `cmd_epoch_checker`, we can safely guarantee
                     // that this proposal will be committed if there is no abnormal leader transfer
                     // in the near future. Thus proposed callback can be called.
+                    if ctx.print_info {
+                        info!("peer::propose, will call proposed callback"; 
+                        "thread" => ?std::thread::current().name());
+                    }
                     cb.invoke_proposed();
                 }
                 if is_urgent {

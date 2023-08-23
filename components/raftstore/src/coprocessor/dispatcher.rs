@@ -791,6 +791,9 @@ impl<E: KvEngine> CoprocessorHost<E> {
     /// Returns false if the message should not be stepped later.
     pub fn on_raft_message(&self, msg: &RaftMessage) -> bool {
         for observer in &self.registry.message_observers {
+            tikv_util::info!("CoprocessorHost::on_raft_message, traverse message_observers"; 
+            "msg" => ?msg,
+            "thread" => ?std::thread::current().name());
             let observer = observer.observer.inner();
             if !observer.on_raft_message(msg) {
                 return false;

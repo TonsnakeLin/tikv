@@ -6,7 +6,7 @@ use std::sync::mpsc;
 use crossbeam::channel::{SendError, TrySendError};
 use engine_traits::{KvEngine, RaftEngine, Snapshot};
 use kvproto::raft_serverpb::RaftMessage;
-use tikv_util::{error, warn};
+use tikv_util::{error, info, warn};
 
 use super::{AsyncReadNotifier, FetchedLogs, GenSnapRes};
 use crate::{
@@ -115,6 +115,10 @@ where
         &self,
         cmd: RaftCommand<EK::Snapshot>,
     ) -> std::result::Result<(), TrySendError<RaftCommand<EK::Snapshot>>> {
+        if cmd.request.get_header().get_print_info() {
+            info!("imp ProposalRouter for RaftRouter, send(self, RaftCommand)"; 
+            "thread" => ?std::thread::current().name());
+        }
         self.send_raft_command(cmd)
     }
 }

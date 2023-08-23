@@ -498,12 +498,22 @@ where
             flags |= WriteBatchFlags::FLASHBACK.bits();
         }
         header.set_flags(flags);
-
+        let print_info = ctx.get_request_source().contains("external_") ;
+        if print_info {
+            info!("async_write, begin..."; 
+            "thread" => ?std::thread::current().name());
+            header.set_print_info(true);
+        }
+        
         let mut cmd = RaftCmdRequest::default();
         cmd.set_header(header);
         cmd.set_requests(reqs.into());
 
         self.schedule_txn_extra(txn_extra);
+
+        let cmd1_cpy = cmd.clone();
+        let cmd2_cpy = cmd.clone();
+        let cmd3_cpy = cmd.clone();
 
         let (tx, rx) = WriteResFeed::pair();
         if res.is_ok() {
@@ -511,13 +521,27 @@ where
                 None
             } else {
                 let tx = tx.clone();
-                Some(Box::new(move || tx.notify_proposed()) as store::ExtCallback)
+                Some(Box::new(move || { 
+                    if print_info {
+                        info!("async_write, call proposed_callback"; 
+                        "cmd" => ?cmd1_cpy.clone(),
+                        "thread" => ?std::thread::current().name());
+                    }
+                    tx.notify_proposed()
+                }) as store::ExtCallback)
             };
             let committed_cb = if !WriteEvent::subscribed_committed(subscribed) {
                 None
             } else {
                 let tx = tx.clone();
-                Some(Box::new(move || tx.notify_committed()) as store::ExtCallback)
+                Some(Box::new(move || {
+                    if print_info {
+                        info!("async_write, call committed_callback"; 
+                        "cmd" => ?cmd2_cpy.clone(),
+                        "thread" => ?std::thread::current().name());
+                    }
+                    tx.notify_committed()
+                }) as store::ExtCallback)
             };
             let applied_tx = tx.clone();
             let applied_cb = must_call(
@@ -539,6 +563,11 @@ where
                     };
                     if let Some(cb) = on_applied {
                         cb(&mut res);
+                    }
+                    if print_info {
+                        info!("async_write, call applied_callback"; 
+                        "req" => ?cmd3_cpy.clone(),
+                        "thread" => ?std::thread::current().name());
                     }
                     applied_tx.notify(res);
                 }),
