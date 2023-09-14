@@ -372,6 +372,10 @@ where
         fail_point!("send_raft_message_full", |_| Err(TrySendError::Full(
             RaftMessage::default()
         )));
+        if msg.get_print_info() {
+            info!("RaftRouter::send_raft_message"; 
+            "thread" => ?std::thread::current().name());
+        }
 
         let id = msg.get_region_id();
 
@@ -802,9 +806,11 @@ impl<'a, EK: KvEngine + 'static, ER: RaftEngine + 'static, T: Transport>
         for m in msgs.drain(..) {
             match m {
                 StoreMsg::Tick(tick) => {
+                    /*
                     info!("StoreFsmDelegate::handle_msgs, StoreMsg::Tick"; 
                     "tick" => ?tick,
                     "thread" => ?std::thread::current().name());
+                    */
                     self.on_tick(tick);
                 }
                 StoreMsg::RaftMessage(msg) => {
@@ -1064,6 +1070,10 @@ impl<EK: KvEngine, ER: RaftEngine, T: Transport> PollHandler<PeerFsm<EK, ER>, St
 
         if let Some(write_worker) = &mut self.poll_ctx.sync_write_worker {
             if self.poll_ctx.trans.need_flush() && !write_worker.is_empty() {
+                if self.poll_ctx.print_info {
+                    info!("light_end, flush RaftMessages"; 
+                    "thread" => ?std::thread::current().name());
+                }
                 self.poll_ctx.trans.flush();
             }
 

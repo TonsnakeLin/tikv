@@ -36,7 +36,7 @@ use tikv_util::{
     time::Instant,
     worker::Scheduler,
 };
-use tracker::{set_tls_tracker_token, RequestInfo, RequestType, Tracker, GLOBAL_TRACKERS};
+use tracker::{set_tls_tracker_token, RequestInfo, RequestType, Tracker, GLOBAL_TRACKERS, get_tls_tracker_token};
 use txn_types::{self, Key};
 
 use super::batch::{BatcherBuilder, ReqBatcher};
@@ -154,6 +154,12 @@ impl<E: Engine, L: LockManager, F: KvFormat> Service<E, L, F> {
         msg: RaftMessage,
         reject: bool,
     ) -> RaftStoreResult<()> {
+        if msg.print_info {
+            let token = get_tls_tracker_token();
+            info!("Service::handle_raft_message"; 
+            "tracker_token" => ?token,
+            "thread" => ?std::thread::current().name());
+        }
         let to_store_id = msg.get_to_peer().get_store_id();
         if to_store_id != store_id {
             return Err(RaftStoreError::StoreNotMatch {

@@ -408,9 +408,9 @@ impl<N: Fsm, C: Fsm, Handler: PollHandler<N, C>> Poller<N, C, Handler> {
                             info!("Poller::poll, result is HandleResult::StopAt"; 
                             "progress" => progress,
                             "skip_end" => skip_end,
-                            "thread" => ?std::thread::current().name());
-                            p.policy = Some(ReschedulePolicy::Release(progress));
+                            "thread" => ?std::thread::current().name());                            
                         }
+                        p.policy = Some(ReschedulePolicy::Release(progress));
                         reschedule_fsms.push(i);
                         if skip_end {
                             to_skip_end.push(i);

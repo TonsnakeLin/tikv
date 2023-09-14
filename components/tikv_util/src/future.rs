@@ -30,6 +30,13 @@ where
 {
     let (tx, future) = futures_oneshot::channel::<T>();
     let callback = Box::new(move |result| {
+        tracker::with_tls_tracker(|tracker|{
+            if tracker.req_info.print_info {
+                info!("execute bottom callback"; 
+                "req_info" => ?tracker.req_info,
+                "thread" => ?std::thread::current().name());
+            }
+        });
         let r = tx.send(result);
         if r.is_err() {
             warn!("paired_future_callback: Failed to send result to the future rx, discarded.");

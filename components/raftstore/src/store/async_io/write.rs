@@ -206,6 +206,21 @@ where
     pub flushed_epoch: Option<RegionEpoch>,
 }
 
+impl<EK, ER> std::fmt::Debug for WriteTask<EK, ER> 
+where 
+    EK: KvEngine, ER: RaftEngine,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "region_id {}, peer_id {}, ready_number {}, raft_wb.persist_size {}, 
+        overwrite_to {}, entries.len {}, messages.len {}", 
+        self.region_id, self.peer_id, self.ready_number, 
+        self.raft_wb.as_ref().map_or(0, |wb|wb.persist_size()),
+        self.overwrite_to.map_or(0, |x| x),
+        self.entries.len(),
+        self.messages.len())
+    }
+}
+
 impl<EK, ER> WriteTask<EK, ER>
 where
     EK: KvEngine,
@@ -391,6 +406,41 @@ where
     // region_id -> (peer_id, ready_number)
     pub readies: HashMap<u64, (u64, u64)>,
     pub(crate) raft_wb_split_size: usize,
+}
+
+
+impl<EK, ER> std::fmt::Debug for  WriteTaskBatch<EK, ER>
+where
+    EK: KvEngine,
+    ER: RaftEngine,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        /*
+        write!(f, "raft_wb.len {}, 
+        raft_states {:?}, tasks.len {}, readies {:?}", 
+        self.raft_wbs.len(),
+        self.raft_states,
+        self.tasks.len(),
+        self.readies)   
+        */
+        write!(f,"WriteTaskBatch {:?}", self.to_string())
+    }
+}
+
+impl<EK, ER> ToString for  WriteTaskBatch<EK, ER>
+where
+    EK: KvEngine,
+    ER: RaftEngine,
+{
+    fn to_string(&self) -> String {
+        format!(
+            "raft_wb.len {}, raft_states {:?}, tasks.len {}, readies {:?}", 
+            self.raft_wbs.len(),
+            self.raft_states,
+            self.tasks.len(),
+            self.readies
+        )
+    }
 }
 
 impl<EK, ER> WriteTaskBatch<EK, ER>
@@ -698,6 +748,10 @@ where
 
     pub fn handle_write_task(&mut self, task: WriteTask<EK, ER>) {
         self.batch.add_write_task(&self.raft_engine, task);
+    }
+
+    pub fn get_batch_string(&self) -> String {
+        self.batch.to_string()
     }
 
     pub fn write_to_db(&mut self, notify: bool) {

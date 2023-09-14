@@ -480,6 +480,7 @@ pub struct UnpersistedReady {
     pub raft_msgs: Vec<Vec<eraftpb::Message>>,
 }
 
+#[derive(Debug)]
 pub struct ReadyResult {
     pub state_role: Option<StateRole>,
     pub has_new_entries: bool,
@@ -1570,16 +1571,18 @@ where
 
             let to_peer_id = msg.get_to_peer().get_id();
             let to_store_id = msg.get_to_peer().get_store_id();
-
-            debug!(
-                "send raft msg";
-                "region_id" => self.region_id,
-                "peer_id" => self.peer.get_id(),
-                "msg_type" => ?msg_type,
-                "msg_size" => msg.get_message().compute_size(),
-                "to" => to_peer_id,
-                "disk_usage" => ?msg.get_disk_usage(),
-            );
+            if ctx.print_info {
+                info!(
+                    "send raft msg";
+                    "region_id" => self.region_id,
+                    "peer_id" => self.peer.get_id(),
+                    "msg_type" => ?msg_type,
+                    "msg_size" => msg.get_message().compute_size(),
+                    "to" => to_peer_id,
+                    "disk_usage" => ?msg.get_disk_usage(),
+                    "thread" => ?std::thread::current().name(),
+                );
+            }
 
             for (term, index) in msg
                 .get_message()
@@ -1636,6 +1639,11 @@ where
         ctx: &PollContext<EK, ER, T>,
         msgs: Vec<eraftpb::Message>,
     ) -> Vec<RaftMessage> {
+        if ctx.print_info {
+            info!("peer::build_raft_messages";
+            "thread" => ?std::thread::current().name());
+        }
+        
         let mut raft_msgs = Vec::with_capacity(msgs.len());
         for msg in msgs {
             if let Some(m) = self.build_raft_message(msg, ctx.self_disk_usage) {
@@ -1712,7 +1720,18 @@ where
         let from_id = m.get_from();
         let has_snap_task = self.get_store().has_gen_snap_task();
         let pre_commit_index = self.raft_group.raft.raft_log.committed;
+        let print_info = m.get_print_info();
+        if print_info {
+            info!("Peer::step, before raft_group.step"; 
+            "raft_group" => ?self.raft_group,
+            "thread" => ?std::thread::current().name());
+        }
         self.raft_group.step(m)?;
+        if print_info {
+            info!("Peer::step, after raft_group.step"; 
+            "raft_group" => ?self.raft_group,
+            "thread" => ?std::thread::current().name());
+        }
         self.report_commit_log_duration(pre_commit_index, &ctx.raft_metrics);
 
         let mut for_balance = false;
@@ -2508,6 +2527,12 @@ where
         );
 
         let mut ready = self.raft_group.ready();
+        if ctx.print_info {
+            info!("raft_group ready() finished"; 
+            "ready" => ?ready,
+            "raft_group" => ?self.raft_group,
+            "thread" => ?std::thread::current().name());
+        }
 
         self.add_ready_metric(&ready, &mut ctx.raft_metrics);
 
@@ -2546,11 +2571,20 @@ where
             assert!(self.is_leader());
             let raft_msgs = self.build_raft_messages(ctx, ready.take_messages());
             self.send_raft_messages(ctx, raft_msgs);
+            if ctx.print_info {
+                info!("peer::handle_raft_ready_append, after send_raft_messages"; 
+                "raft_group" => ?self.raft_group,
+                "thread" => ?std::thread::current().name());
+            }
         }
 
         self.apply_reads(ctx, &ready);
 
         if !ready.committed_entries().is_empty() {
+            if ctx.print_info {
+                info!("peer::handle_raft_ready_append, begin to handle_raft_committed_entries"; 
+                "thread" => ?std::thread::current().name());
+            }
             self.handle_raft_committed_entries(ctx, ready.take_committed_entries());
         }
         // Check whether there is a pending generate snapshot task, the task
@@ -2601,6 +2635,10 @@ where
             HandleReadyResult::SendIoTask | HandleReadyResult::Snapshot { .. } => {
                 if !persisted_msgs.is_empty() {
                     task.messages = self.build_raft_messages(ctx, persisted_msgs);
+                    if ctx.print_info {
+                        info!("It build raft messages from persisted_msgs";                         
+                        "thread" => ?std::thread::current().name());
+                    }  
                 }
 
                 if !trackers.is_empty() {
@@ -2613,6 +2651,12 @@ where
                     assert_eq!(self.unpersisted_ready, None);
                     self.unpersisted_ready = Some(ready);
                     has_write_ready = true;
+                    if ctx.print_info {
+                        info!("It has sync-write-worker"; 
+                        "write_worker.batch" => ?write_worker.get_batch_string(),
+                        "unpersisted_ready" => ?self.unpersisted_ready,
+                        "thread" => ?std::thread::current().name());
+                    }                    
                 } else {
                     self.write_router.send_write_msg(
                         ctx,
@@ -2625,6 +2669,10 @@ where
                         max_empty_number: ready_number,
                         raft_msgs: vec![],
                     });
+                    if ctx.print_info {
+                        info!("It has async-write-worker"; 
+                        "thread" => ?std::thread::current().name());
+                    }
 
                     self.raft_group.advance_append_async(ready);
                 }
@@ -2640,6 +2688,12 @@ where
                         );
                     }
                     last.max_empty_number = ready_number;
+
+                    if ctx.print_info {
+                        info!("It is NoIoTask and Peer has unpersisted_readies"; 
+                        "unpersistedReady" => ?last,
+                        "thread" => ?std::thread::current().name());
+                    }
 
                     if !persisted_msgs.is_empty() {
                         self.unpersisted_message_count += persisted_msgs.capacity();
@@ -2661,6 +2715,12 @@ where
                     // needs to be persisted.
                     let mut light_rd = self.raft_group.advance_append(ready);
 
+                    if ctx.print_info {
+                        info!("It is NoIoTask and Peer has no unpersisted_readies"; 
+                        "light_rd" => ?light_rd,
+                        "thread" => ?std::thread::current().name());
+                    }
+
                     self.add_light_ready_metric(&light_rd, &mut ctx.raft_metrics);
 
                     if let Some(idx) = light_rd.commit_index() {
@@ -2679,6 +2739,12 @@ where
                     // The committed entries may not be empty when the size is too large to
                     // be fetched in the previous ready.
                     if !light_rd.committed_entries().is_empty() {
+                        
+                        if ctx.print_info {
+                            info!("It is NoIoTask and will call handle_raft_committed_entries"; 
+                            "light_rd" => ?light_rd,
+                            "thread" => ?std::thread::current().name());
+                        }
                         self.handle_raft_committed_entries(ctx, light_rd.take_committed_entries());
                     }
                 }
@@ -3036,7 +3102,21 @@ where
 
         let pre_persist_index = self.raft_group.raft.raft_log.persisted;
         let pre_commit_index = self.raft_group.raft.raft_log.committed;
+        if ctx.print_info {
+            info!("handle_raft_ready_advance, before raft_group.advance_append"; 
+            "ready" => ?ready,
+            "raft_group" => ?self.raft_group,
+            "thread" => ?std::thread::current().name());
+            self.raft_group.set_print_info(true);
+        }
         let mut light_rd = self.raft_group.advance_append(ready);
+        if ctx.print_info {
+            info!("handle_raft_ready_advance, before raft_group.advance_append"; 
+            "light_rd" => ?light_rd,
+            "raft_group" => ?self.raft_group,
+            "thread" => ?std::thread::current().name());
+            self.raft_group.set_print_info(false);
+        }
         self.report_persist_log_duration(pre_persist_index, &ctx.raft_metrics);
         self.report_commit_log_duration(pre_commit_index, &ctx.raft_metrics);
 
@@ -3065,12 +3145,20 @@ where
             if !self.is_leader() {
                 fail_point!("raft_before_follower_send");
             }
+            if ctx.print_info {
+                info!("handle_raft_ready_advance, light_rd has messages"; 
+                "thread" => ?std::thread::current().name());
+            }
             let msgs = light_rd.take_messages();
             let m = self.build_raft_messages(ctx, msgs);
             self.send_raft_messages(ctx, m);
         }
 
         if !light_rd.committed_entries().is_empty() {
+            if ctx.print_info {
+                info!("handle_raft_ready_advance, light_rd has committed entries"; 
+                "thread" => ?std::thread::current().name());
+            }
             self.handle_raft_committed_entries(ctx, light_rd.take_committed_entries());
         }
 
@@ -4214,13 +4302,21 @@ where
         let propose_index = self.next_proposal_index();
         if poll_ctx.print_info {
             self.raft_group.set_print_info(true);
+            info!("peer::propose_normal, before propose"; 
+            "raft_group" => ?self.raft_group,
+            "thread" => ?std::thread::current().name());
         }
         self.raft_group.propose(ctx.to_vec(), data)?;
         if self.next_proposal_index() == propose_index {
             // The message is dropped silently, this usually due to leader absence
             // or transferring leader. Both cases can be considered as NotLeader error.
-            self.raft_group.set_print_info(false);
+            // self.raft_group.set_print_info(false);
             return Err(Error::NotLeader(self.region_id, None));
+        }
+        if poll_ctx.print_info {
+            info!("peer::propose_normal, after propose"; 
+            "raft_group" => ?self.raft_group,
+            "thread" => ?std::thread::current().name());
         }
 
         // Prepare Merge need to be broadcast to as many as followers when disk full.
@@ -5180,7 +5276,7 @@ where
             send_msg.set_start_key(region.get_start_key().to_vec());
             send_msg.set_end_key(region.get_end_key().to_vec());
         }
-
+        send_msg.set_print_info(msg.get_print_info());
         send_msg.set_message(msg);
 
         Some(send_msg)

@@ -1586,6 +1586,10 @@ impl<E: Engine, L: LockManager> TxnScheduler<E, L> {
             (!removed_pessimistic_locks.is_empty()).then(|| RwLockWriteGuard::downgrade(guard))
         });
         let on_applied = Box::new(move |res: &mut kv::Result<()>| {
+            if print_info {
+                info!("calling on_applied"; 
+                "thread" => ?std::thread::current().name());
+            }
             if res.is_ok() && !removed_pessimistic_locks.is_empty() {
                 // Removing pessimistic locks when it succeeds to apply. This should be done in
                 // the apply thread, to make sure it happens before other admin commands are

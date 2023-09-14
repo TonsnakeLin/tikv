@@ -611,10 +611,10 @@ where
     pub fn handle_msgs(&mut self, msgs: &mut Vec<PeerMsg<EK>>) {
         let timer = TiInstant::now_coarse();
         let count = msgs.len();
-        let print_info = false;
         for m in msgs.drain(..) {
             match m {
                 PeerMsg::RaftMessage(msg) => {
+                    self.ctx.set_print_info(msg.msg.get_print_info());
                     if !self.ctx.coprocessor_host.on_raft_message(&msg.msg) {
                         continue;
                     }
@@ -1999,6 +1999,11 @@ where
         self.ctx.pending_count += 1;
         self.ctx.has_ready = true;
         let res = self.fsm.peer.handle_raft_ready_append(self.ctx);
+        if self.ctx.print_info {
+            info!("PeerFsmDelegate::collect_ready"; 
+            "res" => ?res,
+            "thread" => ?std::thread::current().name());
+        }
         if let Some(r) = res {
             self.on_role_changed(r.state_role);
             if r.has_new_entries {
@@ -2016,7 +2021,13 @@ where
 
             return r.has_write_ready;
         }
+        self.set_raft_print_info(false);
         false
+    }
+
+    #[inline]
+    pub fn set_raft_print_info(&mut self, p: bool) {
+        self.fsm.peer.raft_group.set_print_info(p);
     }
 
     #[inline]
@@ -2455,15 +2466,16 @@ where
                 }
             }
         });
-
-        debug!(
-            "handle raft message";
-            "region_id" => self.region_id(),
-            "peer_id" => self.fsm.peer_id(),
-            "message_type" => %util::MsgType(&msg),
-            "from_peer_id" => msg.get_from_peer().get_id(),
-            "to_peer_id" => msg.get_to_peer().get_id(),
-        );
+        if msg.get_print_info() {
+            info!(
+                "handle raft message";
+                "region_id" => self.region_id(),
+                "peer_id" => self.fsm.peer_id(),
+                "message_type" => %util::MsgType(&msg),
+                "from_peer_id" => msg.get_from_peer().get_id(),
+                "to_peer_id" => msg.get_to_peer().get_id(),
+            );
+        }
 
         if self.fsm.peer.pending_remove || self.fsm.stopped {
             return Ok(());

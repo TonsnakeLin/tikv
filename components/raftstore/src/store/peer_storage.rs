@@ -253,6 +253,16 @@ impl<EK: KvEngine, ER: RaftEngine> DerefMut for PeerStorage<EK, ER> {
     }
 }
 
+impl<EK, ER> std::fmt::Debug for PeerStorage<EK, ER>
+where
+    EK: KvEngine,
+    ER: RaftEngine,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Point [{} {:?}]", self.peer_id, self.peer)
+    }
+}
+
 impl<EK, ER> Storage for PeerStorage<EK, ER>
 where
     EK: KvEngine,

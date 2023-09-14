@@ -1071,6 +1071,14 @@ where
         transport_on_send_store_fp();
         loop {
             if let Some(s) = self.cache.get_mut(&(store_id, conn_id)) {
+                if msg.get_print_info() {
+                        info!("RaftClient::send"; 
+                        "store_id" => store_id,
+                        "conn_id" => conn_id,
+                        "from_peer" => msg.get_from_peer().get_id(),
+                        "to_peer" => msg.get_to_peer().get_id(),
+                        "thread" => ?std::thread::current().name());
+                }
                 match s.queue.push(msg) {
                     Ok(_) => {
                         if !s.dirty {
