@@ -103,6 +103,7 @@ where
         let mut state = self.state.lock().unwrap();
         if state.status().get_mode() == ReplicationMode::DrAutoSync {
             let state_id = state.status().get_dr_auto_sync().state_id;
+            info!("get_address"; "state.group" => ?state.group);
             if state.group.group_id(state_id, store_id).is_none() {
                 group_id = state.group.register_store(store_id, s.take_labels().into());
             }

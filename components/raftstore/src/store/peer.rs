@@ -948,6 +948,8 @@ where
         if self.is_initialized() {
             let version = state.status().get_dr_auto_sync().state_id;
             let gb = state.calculate_commit_group(version, self.get_store().region().get_peers());
+            info!("init_replication_mode, calculate_commit_group";
+                "gb" => ?gb);
             self.raft_group.raft.assign_commit_groups(gb);
         }
         self.replication_sync = false;
@@ -959,6 +961,8 @@ where
         }
         self.replication_mode_version = state.status().get_dr_auto_sync().state_id;
         let enable = state.status().get_dr_auto_sync().get_state() != DrAutoSyncState::Async;
+        info!("init_replication_mode, enable_group_commit";
+        "enable" => enable);
         self.raft_group.raft.enable_group_commit(enable);
         self.dr_auto_sync_state = state.status().get_dr_auto_sync().get_state();
     }
@@ -2851,6 +2855,7 @@ where
                 |_| {}
             );
         }
+
         if let Some(last_entry) = committed_entries.last() {
             self.last_applying_idx = last_entry.get_index();
             if self.last_applying_idx >= self.last_urgent_proposal_idx {
@@ -3111,7 +3116,7 @@ where
         }
         let mut light_rd = self.raft_group.advance_append(ready);
         if ctx.print_info {
-            info!("handle_raft_ready_advance, before raft_group.advance_append"; 
+            info!("handle_raft_ready_advance, after raft_group.advance_append"; 
             "light_rd" => ?light_rd,
             "raft_group" => ?self.raft_group,
             "thread" => ?std::thread::current().name());

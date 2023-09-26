@@ -777,6 +777,7 @@ impl PdClient for RpcClient {
         req.set_region(region);
 
         let executor = move |client: &Client, req: pdpb::AskSplitRequest| {
+            info!("RpcClient::ask_split");
             let handler = {
                 let inner = client.inner.rl();
                 inner

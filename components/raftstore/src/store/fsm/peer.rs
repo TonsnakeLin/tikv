@@ -4162,7 +4162,12 @@ where
                     panic!("create new split region {:?} err {:?}", new_region, e);
                 }
             };
+            new_peer.peer.raft_group.set_print_info(true);
             let mut replication_state = self.ctx.global_replication_state.lock().unwrap();
+            info!(
+                "on_ready_split_region";
+                "global_replication_state" => ?replication_state
+            );
             new_peer.peer.init_replication_mode(&mut replication_state);
             drop(replication_state);
 
@@ -4184,6 +4189,9 @@ where
                 .get_index()
                 + 1;
             let campaigned = new_peer.peer.maybe_campaign(is_leader);
+            info!("on_ready_split_region, after maybe_campaign";
+                "RawNode" => ?new_peer.peer.raft_group
+                );
             new_peer.has_ready |= campaigned;
 
             if is_leader {
@@ -4211,6 +4219,7 @@ where
                 // check again after split.
                 new_peer.peer.size_diff_hint = self.ctx.cfg.region_split_check_diff().0;
             }
+            new_peer.peer.raft_group.set_print_info(false);
             let mailbox = BasicMailbox::new(sender, new_peer, self.ctx.router.state_cnt().clone());
             self.ctx.router.register(new_region_id, mailbox);
             self.ctx
@@ -4228,7 +4237,7 @@ where
                         warn!("handle first requset failed"; "region_id" => region_id, "error" => ?e);
                     }
                 }
-            }
+            }            
         }
         drop(meta);
         if is_leader {

@@ -1649,7 +1649,11 @@ where
                         .inc();
 
                     let mut split_region = resp.take_split_region();
-                    info!("try to split"; "region_id" => region_id, "region_epoch" => ?epoch);
+                    info!("schedule_heartbeat_receiver, try to split"; 
+                        "region_id" => region_id, 
+                        "region_epoch" => ?epoch,
+                        "CheckPolicy" => ?split_region.get_policy(), 
+                        "thread" => ?std::thread::current().name());
                     let msg = if split_region.get_policy() == pdpb::CheckPolicy::Usekey {
                         CasualMessage::SplitRegion {
                             region_epoch: epoch,

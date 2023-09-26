@@ -828,6 +828,10 @@ impl<E: Engine, L: LockManager, F: KvFormat> Tikv for Service<E, L, F> {
             }
         };
         split_keys.sort();
+        info!("Begin to split region";
+              "split_kyes" => ?split_keys,
+              "thread" => ?std::thread::current().name()
+            );
         let engine = self.storage.get_engine();
         let f = engine.raft_extension().split(
             region_id,

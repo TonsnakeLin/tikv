@@ -1111,6 +1111,15 @@ where
                 break;
             }
 
+            if entry.get_print_info() {
+                info!(
+                    "ApplyDelegate::handle_raft_committed_entries";
+                    "region_id" => self.region_id(),
+                    "peer_id" => self.id(),
+                    "entry" => ?entry,
+                );
+            }
+
             let expect_index = self.apply_state.get_applied_index() + 1;
             if expect_index != entry.get_index() {
                 panic!(

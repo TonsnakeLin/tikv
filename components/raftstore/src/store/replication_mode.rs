@@ -52,7 +52,10 @@ impl StoreGroup {
         store_id: u64,
         labels: Vec<metapb::StoreLabel>,
     ) -> Option<u64> {
-        info!("associated store labels"; "store_id" => store_id, "labels" => ?labels);
+        info!("associated store labels"; 
+            "store_id" => store_id, 
+            "labels" => ?labels,
+        );
         let key = &self.label_key;
         match self.stores.entry(store_id) {
             HashMapEntry::Occupied(o) => {

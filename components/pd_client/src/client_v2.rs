@@ -1118,6 +1118,7 @@ impl PdClient for RpcClient {
 
         let mut raw_client = self.raw_client.clone();
         Box::pin(async move {
+            info!("RpcClient2::ask_split");
             raw_client.wait_for_ready().await?;
             req.set_header(raw_client.header());
             let resp = raw_client
