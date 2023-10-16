@@ -14,9 +14,9 @@ use tikv_util::info;
 /// label value will be mapped to the same group ID.
 #[derive(Default, Debug)]
 pub struct StoreGroup {
-    labels: HashMap<u64, Vec<metapb::StoreLabel>>,
-    label_ids: HashMap<String, u64>,
-    stores: HashMap<u64, u64>,
+    labels: HashMap<u64, Vec<metapb::StoreLabel>>,  // storeid->vec<StoreLabels>
+    label_ids: HashMap<String, u64>, // label_value->groupid
+    stores: HashMap<u64, u64>,  // storeid->groupid
     label_key: String,
     version: u64,
     dirty: bool,
@@ -37,7 +37,7 @@ impl StoreGroup {
         }
 
         let labels = store.take_labels();
-        info!("backup store labels"; "store_id" => store.id, "labels" => ?labels);
+        info!("backup store labels"; "store_id" => store.id, "labels" => ?labels, "label_key" => ?self.label_key);
         self.labels.insert(store.id, labels.into());
         self.dirty = true;
     }
@@ -55,6 +55,7 @@ impl StoreGroup {
         info!("associated store labels"; 
             "store_id" => store_id, 
             "labels" => ?labels,
+            "label_key" => ?self.label_key
         );
         let key = &self.label_key;
         match self.stores.entry(store_id) {

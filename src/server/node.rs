@@ -340,11 +340,13 @@ where
         if let Some(s) = status {
             state.set_status(s);
         }
+        info!("initializing replication mode"; "global_replication_status1" => ?state);
         for mut store in stores {
             state
                 .group
                 .register_store(store.id, store.take_labels().into());
         }
+        info!("initializing replication mode"; "global_replication_status2" => ?state);
     }
 
     // Exported for tests.
