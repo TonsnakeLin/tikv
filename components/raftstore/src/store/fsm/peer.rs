@@ -611,6 +611,8 @@ where
     pub fn handle_msgs(&mut self, msgs: &mut Vec<PeerMsg<EK>>) {
         let timer = TiInstant::now_coarse();
         let count = msgs.len();
+        // info!("handle_msgs";
+        // "prs" => ?self.fsm.peer.raft_group.raft.prs());
         for m in msgs.drain(..) {
             match m {
                 PeerMsg::RaftMessage(msg) => {

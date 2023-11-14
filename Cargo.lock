@@ -4490,7 +4490,7 @@ dependencies = [
 [[package]]
 name = "raft"
 version = "0.7.0"
-source = "git+https://github.com/TonsnakeLin/raft-rs.git?branch=raft-learn#3d95eea6367f6d0edf3a826f99b2af30224e20bc"
+source = "git+https://github.com/TonsnakeLin/raft-rs.git?branch=raft-learn#83acb863234d2d08d35f5bf1d3aeaf73505782fc"
 dependencies = [
  "bytes",
  "fxhash",
@@ -4549,7 +4549,7 @@ dependencies = [
 [[package]]
 name = "raft-proto"
 version = "0.7.0"
-source = "git+https://github.com/TonsnakeLin/raft-rs.git?branch=raft-learn#3d95eea6367f6d0edf3a826f99b2af30224e20bc"
+source = "git+https://github.com/TonsnakeLin/raft-rs.git?branch=raft-learn#83acb863234d2d08d35f5bf1d3aeaf73505782fc"
 dependencies = [
  "bytes",
  "protobuf",

@@ -985,6 +985,11 @@ where
                 _ => (true, true),
             }
         };
+        info!(
+            "switch_replication_mode";
+            "input_dr_state" => ?guard.status(),
+            "self.dr_auto_sync_state" => ?self.dr_auto_sync_state
+        );
         drop(guard);
         self.switch_group_commit(enable_group_commit, calculate_group_id, state);
     }
@@ -5104,6 +5109,10 @@ where
             state_id: self.replication_mode_version,
             ..Default::default()
         };
+        info!(
+            "region_replication_status";
+            "self.replication_sync" => self.replication_sync
+        );
         let state = if !self.replication_sync {
             if self.dr_auto_sync_state != DrAutoSyncState::Async {
                 // use raft_log_gc_threshold, it's indicate the log is almost synced.
@@ -5165,6 +5174,9 @@ where
             self.raft_group.raft.enable_group_commit(true);
             let (index, mut group_consistent) =
                 self.raft_group.raft.mut_prs().maximal_committed_index();
+            info!("check_group_commit_consistent";
+            "index" => index,
+            "group_consistent" => group_consistent);                
             if self.raft_group.raft.raft_log.committed > index {
                 group_consistent &= self.raft_group.raft.raft_log.committed - index < allow_gap;
             }
