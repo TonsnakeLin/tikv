@@ -26,13 +26,10 @@ pub struct DagHandlerBuilder<S: Store + 'static, F: KvFormat> {
     data_version: Option<u64>,
     deadline: Deadline,
     batch_row_limit: usize,
-    /// It's used for the sqls like "SELECT DISTINCT ... LIMIT 3". The value is 3 for the case above.
-    agg_final_limit: usize,
     is_streaming: bool,
     is_cache_enabled: bool,
     paging_size: Option<u64>,
     quota_limiter: Arc<QuotaLimiter>,
-    print_extra_log: bool,
     _phantom: PhantomData<F>,
 }
 
@@ -47,7 +44,6 @@ impl<S: Store + 'static, F: KvFormat> DagHandlerBuilder<S, F> {
         is_cache_enabled: bool,
         paging_size: Option<u64>,
         quota_limiter: Arc<QuotaLimiter>,
-        print_extra_log: bool
     ) -> Self {
         DagHandlerBuilder {
             req,
@@ -56,12 +52,10 @@ impl<S: Store + 'static, F: KvFormat> DagHandlerBuilder<S, F> {
             data_version: None,
             deadline,
             batch_row_limit,
-            agg_final_limit: 3,
             is_streaming,
             is_cache_enabled,
             paging_size,
             quota_limiter,
-            print_extra_log,
             _phantom: PhantomData,
         }
     }
@@ -85,7 +79,6 @@ impl<S: Store + 'static, F: KvFormat> DagHandlerBuilder<S, F> {
             self.is_streaming,
             self.paging_size,
             self.quota_limiter,
-            self.print_extra_log
         )?
         .into_boxed())
     }
@@ -108,7 +101,6 @@ impl BatchDagHandler {
         is_streaming: bool,
         paging_size: Option<u64>,
         quota_limiter: Arc<QuotaLimiter>,
-        print_extra_log: bool,
     ) -> Result<Self> {
         Ok(Self {
             runner: tidb_query_executors::runner::BatchExecutorsRunner::from_request::<_, F>(
@@ -120,7 +112,6 @@ impl BatchDagHandler {
                 is_streaming,
                 paging_size,
                 quota_limiter,
-                print_extra_log
             )?,
             data_version,
         })

@@ -30,7 +30,6 @@
 use std::{convert::TryFrom, sync::Arc};
 
 use async_trait::async_trait;
-use slog::info;
 use tidb_query_aggr::*;
 use tidb_query_common::{storage::IntervalRange, Result};
 use tidb_query_datatype::{
@@ -142,6 +141,7 @@ impl<Src: BatchExecutor, I: AggregationExecutorImpl<Src>> AggregationExecutor<Sr
         config: Arc<EvalConfig>,
         aggr_defs: Vec<Expr>,
         aggr_def_parser: impl AggrDefinitionParser,
+        limit_count: u64,
     ) -> Result<Self> {
         let aggr_fn_len = aggr_defs.len();
         let src_schema = src.schema();
@@ -199,7 +199,7 @@ impl<Src: BatchExecutor, I: AggregationExecutorImpl<Src>> AggregationExecutor<Sr
             is_ended: false,
             entities,
             required_row: ctx.cfg.paging_size,
-            agg_final_limit: 3,
+            agg_final_limit: limit_count,
         })
     }
 

@@ -68,9 +68,6 @@ pub struct BatchExecutorsRunner<SS> {
     /// Maximum rows to return in batch stream mode.
     stream_row_limit: usize,
 
-    /// It's used for the sqls like "SELECT DISTINCT ... LIMIT 3". The value is 3 for the case above.
-    agg_final_limit: usize,
-
     /// The encoding method for the response.
     /// Possible encoding methods are:
     /// 1. default: result is encoded row by row using datum format.
@@ -82,8 +79,6 @@ pub struct BatchExecutorsRunner<SS> {
     paging_size: Option<u64>,
 
     quota_limiter: Arc<QuotaLimiter>,
-
-    print_extra_log: bool,
 }
 
 // We assign a dummy type `()` so that we can omit the type when calling
@@ -304,6 +299,7 @@ pub fn build_executors<S: Storage + 'static, F: KvFormat>(
                             executor,
                             ed.mut_aggregation().take_group_by().into(),
                             ed.mut_aggregation().take_agg_func().into(),
+                            ed.get_aggregation().get_limit_count(),
                         )?
                         .collect_summary(summary_slot_index),
                     )
@@ -316,6 +312,7 @@ pub fn build_executors<S: Storage + 'static, F: KvFormat>(
                             executor,
                             ed.mut_aggregation().take_group_by().into(),
                             ed.mut_aggregation().take_agg_func().into(),
+                            ed.get_aggregation().get_limit_count(),
                         )?
                         .collect_summary(summary_slot_index),
                     )
@@ -436,7 +433,6 @@ impl<SS: 'static> BatchExecutorsRunner<SS> {
         is_streaming: bool,
         paging_size: Option<u64>,
         quota_limiter: Arc<QuotaLimiter>,
-        print_extra_log: bool
     ) -> Result<Self> {
         let executors_len = req.get_executors().len();
         let collect_exec_summary = req.get_collect_execution_summaries();
@@ -483,11 +479,9 @@ impl<SS: 'static> BatchExecutorsRunner<SS> {
             collect_exec_summary,
             exec_stats,
             stream_row_limit,
-            agg_final_limit: 3,
             encode_type,
             paging_size,
             quota_limiter,
-            print_extra_log
         })
     }
 
@@ -543,13 +537,6 @@ impl<SS: 'static> BatchExecutorsRunner<SS> {
             }
 
             if drained.stop() || self.paging_size.map_or(false, |p| record_all >= p as usize) {
-                if self.print_extra_log {
-                    tikv_util::info!(
-                        "It's time to send respone because of finishing fetching data or reaching paging size";
-                        "record_all" => record_all,
-                        "paging_size" => ?self.paging_size,
-                    );
-                }
                 self.out_most_executor
                     .collect_exec_stats(&mut self.exec_stats);
                 let range = if drained == BatchExecIsDrain::Drain {

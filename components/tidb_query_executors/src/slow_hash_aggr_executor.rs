@@ -102,6 +102,7 @@ impl<Src: BatchExecutor> BatchSlowHashAggregationExecutor<Src> {
             group_by_exps,
             aggr_defs,
             aggr_def_parser,
+            0,
         )
         .unwrap()
     }
@@ -114,7 +115,7 @@ impl<Src: BatchExecutor> BatchSlowHashAggregationExecutor<Src> {
         aggr_defs: Vec<Expr>,
         aggr_def_parser: impl AggrDefinitionParser,
     ) -> Self {
-        Self::new_impl(config, src, group_by_exps, aggr_defs, aggr_def_parser).unwrap()
+        Self::new_impl(config, src, group_by_exps, aggr_defs, aggr_def_parser, 0).unwrap()
     }
 
     pub fn new(
@@ -122,6 +123,7 @@ impl<Src: BatchExecutor> BatchSlowHashAggregationExecutor<Src> {
         src: Src,
         group_by_exp_defs: Vec<Expr>,
         aggr_defs: Vec<Expr>,
+        limit_count: u64,
     ) -> Result<Self> {
         let schema_len = src.schema().len();
         let mut ctx = EvalContext::new(config.clone());
@@ -138,6 +140,7 @@ impl<Src: BatchExecutor> BatchSlowHashAggregationExecutor<Src> {
             group_by_exps,
             aggr_defs,
             AllAggrDefinitionParser,
+            limit_count,
         )
     }
 
@@ -148,6 +151,7 @@ impl<Src: BatchExecutor> BatchSlowHashAggregationExecutor<Src> {
         group_by_exps: Vec<RpnExpression>,
         aggr_defs: Vec<Expr>,
         aggr_def_parser: impl AggrDefinitionParser,
+        limit_count: u64,
     ) -> Result<Self> {
         let mut group_key_offsets = Vec::with_capacity(1024);
         group_key_offsets.push(0);
@@ -190,6 +194,7 @@ impl<Src: BatchExecutor> BatchSlowHashAggregationExecutor<Src> {
             config,
             aggr_defs,
             aggr_def_parser,
+            limit_count,
         )?))
     }
 }

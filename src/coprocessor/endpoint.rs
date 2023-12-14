@@ -175,14 +175,6 @@ impl<E: Engine> Endpoint<E> {
         fail_point!("coprocessor_parse_request", |_| Err(box_err!(
             "unsupported tp (failpoint)"
         )));
-        let mut print_extra_log = false;
-        if req.get_context().get_request_source().contains("external_") {
-            info!(
-                    "parse_request_and_check_memory_locks_impl";
-                    "req" => ?req
-                );
-            print_extra_log = true;
-        }
 
         let (context, data, ranges, mut start_ts) = (
             req.take_context(),
@@ -270,7 +262,6 @@ impl<E: Engine> Endpoint<E> {
                         req.get_is_cache_enabled(),
                         paging_size,
                         quota_limiter,
-                        print_extra_log
                     )
                     .data_version(data_version)
                     .build()
