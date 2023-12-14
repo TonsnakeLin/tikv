@@ -136,8 +136,9 @@ impl<Src: BatchExecutor> BatchFastHashAggregationExecutor<Src> {
         group_by_exp: RpnExpression,
         aggr_defs: Vec<Expr>,
         aggr_def_parser: impl AggrDefinitionParser,
+        limit_count: u64,
     ) -> Self {
-        Self::new_impl(config, src, group_by_exp, aggr_defs, aggr_def_parser, 0).unwrap()
+        Self::new_impl(config, src, group_by_exp, aggr_defs, aggr_def_parser, limit_count).unwrap()
     }
 
     pub fn new(
