@@ -211,10 +211,6 @@ impl<Src: BatchExecutor, I: AggregationExecutorImpl<Src>> AggregationExecutor<Sr
     ) -> Result<(Option<LazyBatchColumnVec>, BatchExecIsDrain)> {
         // Use max batch size from the beginning because aggregation
         // always needs to calculate over all data.
-        tikv_util::info!(
-            "handle_next_batch";
-            "required_row:" => ?self.required_row,
-        );
         let src_result = self
             .entities
             .src
