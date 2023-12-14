@@ -30,6 +30,7 @@
 use std::{convert::TryFrom, sync::Arc};
 
 use async_trait::async_trait;
+use slog::info;
 use tidb_query_aggr::*;
 use tidb_query_common::{storage::IntervalRange, Result};
 use tidb_query_datatype::{
@@ -131,6 +132,7 @@ pub struct AggregationExecutor<Src: BatchExecutor, I: AggregationExecutorImpl<Sr
     is_ended: bool,
     entities: Entities<Src>,
     required_row: Option<u64>,
+    agg_final_limit: u64,
 }
 
 impl<Src: BatchExecutor, I: AggregationExecutorImpl<Src>> AggregationExecutor<Src, I> {
@@ -197,6 +199,7 @@ impl<Src: BatchExecutor, I: AggregationExecutorImpl<Src>> AggregationExecutor<Sr
             is_ended: false,
             entities,
             required_row: ctx.cfg.paging_size,
+            agg_final_limit: 3,
         })
     }
 
@@ -208,6 +211,10 @@ impl<Src: BatchExecutor, I: AggregationExecutorImpl<Src>> AggregationExecutor<Sr
     ) -> Result<(Option<LazyBatchColumnVec>, BatchExecIsDrain)> {
         // Use max batch size from the beginning because aggregation
         // always needs to calculate over all data.
+        tikv_util::info!(
+            "handle_next_batch";
+            "required_row:" => ?self.required_row,
+        );
         let src_result = self
             .entities
             .src
@@ -231,7 +238,11 @@ impl<Src: BatchExecutor, I: AggregationExecutorImpl<Src>> AggregationExecutor<Sr
             )?;
         }
 
-        if let Some(required_row) = self.required_row {
+        if self.agg_final_limit > 0 {
+            if self.imp.groups_len() >= self.agg_final_limit as usize {
+                src_is_drained = BatchExecIsDrain::Drain;
+            }
+        } else if let Some(required_row) = self.required_row {
             if self.imp.groups_len() >= required_row as usize {
                 src_is_drained = BatchExecIsDrain::PagingDrain;
             }
