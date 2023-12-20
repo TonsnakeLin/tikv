@@ -131,6 +131,7 @@ pub struct AggregationExecutor<Src: BatchExecutor, I: AggregationExecutorImpl<Sr
     is_ended: bool,
     entities: Entities<Src>,
     required_row: Option<u64>,
+    agg_final_limit: u64,
 }
 
 impl<Src: BatchExecutor, I: AggregationExecutorImpl<Src>> AggregationExecutor<Src, I> {
@@ -140,6 +141,7 @@ impl<Src: BatchExecutor, I: AggregationExecutorImpl<Src>> AggregationExecutor<Sr
         config: Arc<EvalConfig>,
         aggr_defs: Vec<Expr>,
         aggr_def_parser: impl AggrDefinitionParser,
+        limit_count: u64,
     ) -> Result<Self> {
         let aggr_fn_len = aggr_defs.len();
         let src_schema = src.schema();
@@ -197,6 +199,7 @@ impl<Src: BatchExecutor, I: AggregationExecutorImpl<Src>> AggregationExecutor<Sr
             is_ended: false,
             entities,
             required_row: ctx.cfg.paging_size,
+            agg_final_limit: limit_count,
         })
     }
 
@@ -231,7 +234,11 @@ impl<Src: BatchExecutor, I: AggregationExecutorImpl<Src>> AggregationExecutor<Sr
             )?;
         }
 
-        if let Some(required_row) = self.required_row {
+        if self.agg_final_limit > 0 {
+            if self.imp.groups_len() >= self.agg_final_limit as usize {
+                src_is_drained = BatchExecIsDrain::Drain;
+            }
+        } else if let Some(required_row) = self.required_row {
             if self.imp.groups_len() >= required_row as usize {
                 src_is_drained = BatchExecIsDrain::PagingDrain;
             }
@@ -625,6 +632,7 @@ pub mod tests {
                 group_by_exp(),
                 aggr_definitions.clone(),
                 AllAggrDefinitionParser,
+                0,
             )) as Box<dyn BatchExecutor<StorageStats = ()>>
         };
 
@@ -638,6 +646,7 @@ pub mod tests {
                 vec![group_by_exp()],
                 aggr_definitions.clone(),
                 AllAggrDefinitionParser,
+                0,
             )) as Box<dyn BatchExecutor<StorageStats = ()>>
         };
 
@@ -693,5 +702,73 @@ pub mod tests {
                 assert_eq!(r.physical_columns.rows_len(), row_num[nth_call]);
             }
         }
+    }
+
+    #[test]
+    #[allow(clippy::type_complexity)]
+    fn test_agg_limit() {
+        use std::sync::Arc;
+
+        use futures::executor::block_on;
+        use tidb_query_datatype::expr::EvalConfig;
+        use tidb_query_expr::RpnExpressionBuilder;
+        use tipb::ExprType;
+        use tipb_helper::ExprDefBuilder;
+
+        use crate::{
+            BatchFastHashAggregationExecutor, BatchSlowHashAggregationExecutor,
+        };
+
+        let group_by_exp = || {
+            RpnExpressionBuilder::new_for_test()
+                .push_column_ref_for_test(1)
+                .build_for_test()
+        };
+
+        let aggr_definitions = vec![
+            ExprDefBuilder::aggr_func(ExprType::Count, FieldTypeTp::LongLong)
+                .push_child(ExprDefBuilder::constant_int(1))
+                .build(),
+        ];
+
+        let exec_fast = |src_exec, paging_size| {
+            let mut config = EvalConfig::default();
+            config.paging_size = paging_size;
+            let config = Arc::new(config);
+            Box::new(BatchFastHashAggregationExecutor::new_for_test_with_config(
+                config,
+                src_exec,
+                group_by_exp(),
+                aggr_definitions.clone(),
+                AllAggrDefinitionParser,
+                3,
+            )) as Box<dyn BatchExecutor<StorageStats = ()>>
+        };
+
+        let exec_slow = |src_exec, paging_size| {
+            let mut config = EvalConfig::default();
+            config.paging_size = paging_size;
+            let config = Arc::new(config);
+            Box::new(BatchSlowHashAggregationExecutor::new_for_test_with_config(
+                config,
+                src_exec,
+                vec![group_by_exp()],
+                aggr_definitions.clone(),
+                AllAggrDefinitionParser,
+                3,
+            )) as Box<dyn BatchExecutor<StorageStats = ()>>
+        };
+
+        let executor_builders: Vec<Box<dyn Fn(MockExecutor, Option<u64>) -> _>> =
+            vec![Box::new(exec_fast), Box::new(exec_slow)];
+
+        for exec_builder in &executor_builders {
+            let src_exec = make_src_executor_2();
+            let mut exec = exec_builder(src_exec, Some(5));
+            
+            let r = block_on(exec.next_batch(1));
+            assert!(r.is_drained.unwrap().stop());
+            assert_eq!(r.physical_columns.rows_len(), 4);            
+        }        
     }
 }

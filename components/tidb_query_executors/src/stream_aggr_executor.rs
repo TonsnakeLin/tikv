@@ -201,6 +201,7 @@ impl<Src: BatchExecutor> BatchStreamAggregationExecutor<Src> {
             config,
             aggr_defs,
             aggr_def_parser,
+            0,
         )?))
     }
 }

@@ -124,6 +124,7 @@ impl<Src: BatchExecutor> BatchFastHashAggregationExecutor<Src> {
             group_by_exp,
             aggr_defs,
             aggr_def_parser,
+            0,
         )
         .unwrap()
     }
@@ -135,8 +136,9 @@ impl<Src: BatchExecutor> BatchFastHashAggregationExecutor<Src> {
         group_by_exp: RpnExpression,
         aggr_defs: Vec<Expr>,
         aggr_def_parser: impl AggrDefinitionParser,
+        limit_count: u64,
     ) -> Self {
-        Self::new_impl(config, src, group_by_exp, aggr_defs, aggr_def_parser).unwrap()
+        Self::new_impl(config, src, group_by_exp, aggr_defs, aggr_def_parser, limit_count).unwrap()
     }
 
     pub fn new(
@@ -144,6 +146,7 @@ impl<Src: BatchExecutor> BatchFastHashAggregationExecutor<Src> {
         src: Src,
         group_by_exp_defs: Vec<Expr>,
         aggr_defs: Vec<Expr>,
+        limit_count: u64,
     ) -> Result<Self> {
         assert_eq!(group_by_exp_defs.len(), 1);
         let mut ctx = EvalContext::new(config.clone());
@@ -158,6 +161,7 @@ impl<Src: BatchExecutor> BatchFastHashAggregationExecutor<Src> {
             group_by_exp,
             aggr_defs,
             AllAggrDefinitionParser,
+            limit_count,
         )
     }
 
@@ -168,6 +172,7 @@ impl<Src: BatchExecutor> BatchFastHashAggregationExecutor<Src> {
         group_by_exp: RpnExpression,
         aggr_defs: Vec<Expr>,
         aggr_def_parser: impl AggrDefinitionParser,
+        limit_count: u64,
     ) -> Result<Self> {
         let group_by_field_type = group_by_exp.ret_field_type(src.schema()).clone();
         let group_by_eval_type =
@@ -193,6 +198,7 @@ impl<Src: BatchExecutor> BatchFastHashAggregationExecutor<Src> {
             config,
             aggr_defs,
             aggr_def_parser,
+            limit_count,
         )?))
     }
 }

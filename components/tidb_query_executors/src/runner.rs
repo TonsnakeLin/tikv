@@ -299,6 +299,7 @@ pub fn build_executors<S: Storage + 'static, F: KvFormat>(
                             executor,
                             ed.mut_aggregation().take_group_by().into(),
                             ed.mut_aggregation().take_agg_func().into(),
+                            ed.get_aggregation().get_limit_count(),
                         )?
                         .collect_summary(summary_slot_index),
                     )
@@ -311,6 +312,7 @@ pub fn build_executors<S: Storage + 'static, F: KvFormat>(
                             executor,
                             ed.mut_aggregation().take_group_by().into(),
                             ed.mut_aggregation().take_agg_func().into(),
+                            ed.get_aggregation().get_limit_count(),
                         )?
                         .collect_summary(summary_slot_index),
                     )

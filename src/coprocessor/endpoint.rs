@@ -182,6 +182,7 @@ impl<E: Engine> Endpoint<E> {
             req.take_ranges().to_vec(),
             req.get_start_ts(),
         );
+
         let cache_match_version = if req.get_is_cache_enabled() {
             Some(req.get_cache_if_match_version())
         } else {
